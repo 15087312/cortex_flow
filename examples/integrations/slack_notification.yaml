@@ -1,0 +1,70 @@
+id: slack_notification
+name: "Slack Notification Pipeline"
+version: "1.0.0"
+description: "Fetch user data from API, transform, and send Slack notification"
+
+config:
+  default_tier: "default"
+  timeout: 60
+
+variables:
+  api_base_url:
+    type: string
+    default: "https://api.example.com"
+  slack_webhook_url:
+    type: string
+    required: true
+  user_id:
+    type: string
+    required: true
+
+entry: fetch_user
+
+nodes:
+  fetch_user:
+    type: http_request
+    url: "${api_base_url}/users/${user_id}"
+    method: GET
+    timeout: 15
+    output: fetch_result
+    on_success: format_message
+    on_error: error_handler
+
+  format_message:
+    type: transform
+    input: "${fetch_result.body}"
+    mapping:
+      text: "{{name}} ({{email}}) - Role: {{role}}"
+      username: "$.name"
+      email: "$.email"
+    output: slack_payload
+    on_success: send_slack
+
+  send_slack:
+    type: http_request
+    url: "${slack_webhook_url}"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body: "${slack_payload}"
+    on_success: log_success
+
+  log_success:
+    type: state
+    actions:
+      - action: set
+        target: notification_status
+        value: "sent"
+      - action: set
+        target: notified_user
+        value: "${slack_payload.username}"
+
+  error_handler:
+    type: state
+    actions:
+      - action: set
+        target: notification_status
+        value: "failed"
+      - action: set
+        target: error_info
+        value: "Failed to fetch user ${user_id}"

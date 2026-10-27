@@ -1,0 +1,60 @@
+id: "approval_flow"
+name: "Approval Flow"
+version: "1.0.0"
+description: "Workflow with approval wait step"
+
+config:
+  default_tier: "large"
+  role: "assistant"
+  thread_scope: true
+
+variables:
+  action:
+    type: "string"
+    required: true
+
+entry: "propose_action"
+
+nodes:
+  propose_action:
+    type: "model"
+    tier: "large"
+    identity: "assistant"
+    custom_system: "You are an assistant. Propose an action and explain why."
+    input:
+      action: "${action}"
+    output: "proposal"
+    on_success: "wait_approval"
+
+  wait_approval:
+    type: "wait"
+    event: "user_approval"
+    filter:
+      proposal_id: "${proposal.id}"
+    timeout: 300
+    on_event: "execute_action"
+    on_timeout: "handle_timeout"
+
+  execute_action:
+    type: "tool"
+    tool: "execute"
+    args:
+      action: "${action}"
+    output: "execution_result"
+    on_success: "finalize"
+
+  handle_timeout:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "error"
+        value: "Approval timeout"
+    on_success: "__end__"
+
+  finalize:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "result"
+        value: "${execution_result}"
+    on_success: "__end__"

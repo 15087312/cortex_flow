@@ -1,0 +1,96 @@
+id: webhook_relay
+name: "Webhook Relay & Fan-out"
+version: "1.0.0"
+description: "Receive webhook data, validate, transform, and relay to multiple endpoints"
+
+config:
+  default_tier: "default"
+  timeout: 60
+
+variables:
+  webhook_payload:
+    type: any
+    required: true
+  endpoint_a:
+    type: string
+    default: "https://service-a.example.com/webhook"
+  endpoint_b:
+    type: string
+    default: "https://service-b.example.com/events"
+
+entry: validate
+
+nodes:
+  validate:
+    type: branch
+    mode: expression
+    conditions:
+      - when: "${webhook_payload}"
+        goto: transform_a
+      - when: "true"
+        goto: reject
+    on_success: transform_a
+
+  transform_a:
+    type: transform
+    input: "${webhook_payload}"
+    mapping:
+      event_type: "$.type"
+      event_data: "$.data"
+      source: "webhook_relay"
+      timestamp: "$.timestamp"
+    output: payload_a
+    on_success: send_a
+
+  send_a:
+    type: http_request
+    url: "${endpoint_a}"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      X-Source: "cortexflow-relay"
+    body: "${payload_a}"
+    fail_on_error: false
+    on_success: transform_b
+
+  transform_b:
+    type: transform
+    input: "${webhook_payload}"
+    mapping:
+      action: "$.type"
+      details: "$.data"
+      relayed: true
+    output: payload_b
+    on_success: send_b
+
+  send_b:
+    type: http_request
+    url: "${endpoint_b}"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body: "${payload_b}"
+    fail_on_error: false
+    on_success: summarize
+
+  summarize:
+    type: state
+    actions:
+      - action: set
+        target: relay_status
+        value: "completed"
+      - action: set
+        target: relay_targets
+        value:
+          - "${endpoint_a}"
+          - "${endpoint_b}"
+
+  reject:
+    type: state
+    actions:
+      - action: set
+        target: relay_status
+        value: "rejected"
+      - action: set
+        target: reject_reason
+        value: "empty payload"

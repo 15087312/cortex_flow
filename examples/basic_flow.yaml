@@ -1,0 +1,40 @@
+id: "basic_flow"
+name: "Basic Flow"
+version: "1.0.0"
+description: "A simple sequential workflow"
+
+tiers:
+  default:
+    description: "Default tier"
+    max_concurrency: 1
+
+config:
+  default_tier: "default"
+  role: "assistant"
+  thread_scope: true
+
+variables:
+  input_text:
+    type: "string"
+    required: true
+
+entry: "process"
+
+nodes:
+  process:
+    type: "model"
+    tier: "default"
+    identity: "assistant"
+    custom_system: "You are a helpful assistant."
+    input:
+      text: "${input_text}"
+    output: "result"
+    on_success: "save_result"
+
+  save_result:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "final_output"
+        value: "${result}"
+    on_success: "__end__"

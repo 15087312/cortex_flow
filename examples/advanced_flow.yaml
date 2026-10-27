@@ -1,0 +1,222 @@
+id: "advanced_flow"
+name: "Advanced Flow with Dynamic Tiers"
+version: "1.0.0"
+description: >
+  Demonstrates: custom tiers, foreach loops, parallel execution,
+  map operations, break/continue, nested delegation
+
+# ── Custom tiers (not limited to 3 levels) ──
+tiers:
+  architect:
+    description: "High-level planning and architecture"
+    model: "claude-sonnet-4-20250514"
+    max_concurrency: 1
+    timeout: 120
+
+  planner:
+    description: "Task decomposition"
+    model: "claude-sonnet-4-20250514"
+    parent: "architect"
+    max_concurrency: 2
+
+  reviewer:
+    description: "Code review and quality"
+    model: "claude-sonnet-4-20250514"
+    max_concurrency: 3
+    tools: ["read_file", "lint_check"]
+
+  developer:
+    description: "Code generation"
+    model: "claude-sonnet-4-20250514"
+    parent: "reviewer"
+    max_concurrency: 5
+    tools: ["read_file", "write_file", "run_command"]
+
+  tester:
+    description: "Test generation and execution"
+    model: "claude-sonnet-4-20250514"
+    max_concurrency: 5
+    tools: ["read_file", "write_file", "run_tests"]
+
+  optimizer:
+    description: "Performance optimization"
+    model: "claude-sonnet-4-20250514"
+    parent: "developer"
+    max_concurrency: 2
+
+config:
+  default_tier: "architect"
+  role: "system"
+  thread_scope: true
+
+# ── Dynamic blackboard visibility per tier ──
+blackboard:
+  enabled: true
+  visibility:
+    architect: "all"
+    planner: "observations"
+    reviewer: "recent_10"
+    developer: "recent_5"
+    tester: "recent_5"
+    optimizer: "observations"
+
+variables:
+  project:
+    type: "object"
+    required: true
+  files:
+    type: "array"
+    required: true
+
+entry: "analyze_project"
+
+nodes:
+  # ── Step 1: Architect analyzes and plans ──
+  analyze_project:
+    type: "model"
+    tier: "architect"
+    identity: "architect"
+    custom_system: "You are a software architect. Analyze the project and create a high-level plan."
+    input:
+      project: "${project}"
+    output: "plan"
+    on_success: "decompose_tasks"
+
+  # ── Step 2: Planner decomposes into tasks ──
+  decompose_tasks:
+    type: "model"
+    tier: "planner"
+    identity: "planner"
+    custom_system: "Break down the plan into concrete tasks."
+    input:
+      plan: "${plan}"
+    output: "tasks"
+    on_success: "process_files"
+
+  # ── Step 3: Foreach loop over files ──
+  process_files:
+    type: "loop"
+    loop_mode: "foreach"
+    items: "${files}"
+    item_var: "current_file"
+    index_var: "file_index"
+    body: "review_file"
+    break_condition: "${plan.cancelled} == true"
+    max_iterations: 100
+    on_complete: "parallel_develop"
+
+  # ── Step 4: Reviewer reviews each file ──
+  review_file:
+    type: "model"
+    tier: "reviewer"
+    identity: "reviewer"
+    custom_system: "Review the file for quality and suggest improvements."
+    input:
+      file: "${current_file}"
+      plan: "${plan}"
+    output: "review"
+    on_success: "decide_develop"
+
+  # ── Step 5: Branch - decide if file needs development ──
+  decide_develop:
+    type: "branch"
+    mode: "expression"
+    conditions:
+      - when: "${review.needs_changes} == true"
+        goto: "develop_file"
+      - otherwise: "process_files"
+
+  # ── Step 6: Developer implements changes ──
+  develop_file:
+    type: "model"
+    tier: "developer"
+    identity: "developer"
+    custom_system: "Implement the changes suggested by the review."
+    input:
+      file: "${current_file}"
+      review: "${review}"
+    output: "code"
+    on_success: "process_files"
+
+  # ── Step 7: Parallel development on multiple fronts ──
+  parallel_develop:
+    type: "parallel"
+    branches:
+      - "develop_frontend"
+      - "develop_backend"
+      - "develop_tests"
+    strategy: "all"
+    max_concurrency: 3
+    on_success: "map_optimize"
+
+  develop_frontend:
+    type: "model"
+    tier: "developer"
+    identity: "frontend_dev"
+    custom_system: "Implement frontend changes."
+    input:
+      plan: "${plan}"
+    output: "frontend_result"
+    on_success: "__end__"
+
+  develop_backend:
+    type: "model"
+    tier: "developer"
+    identity: "backend_dev"
+    custom_system: "Implement backend changes."
+    input:
+      plan: "${plan}"
+    output: "backend_result"
+    on_success: "__end__"
+
+  develop_tests:
+    type: "model"
+    tier: "tester"
+    identity: "test_engineer"
+    custom_system: "Generate and run tests."
+    input:
+      plan: "${plan}"
+    output: "test_result"
+    on_success: "__end__"
+
+  # ── Step 8: Map over tasks to optimize each ──
+  map_optimize:
+    type: "map"
+    collection: "${tasks}"
+    element_var: "task"
+    map_body: "optimize_task"
+    output_collection: "optimized_tasks"
+    map_concurrency: 2
+    on_success: "final_merge"
+
+  optimize_task:
+    type: "model"
+    tier: "optimizer"
+    identity: "optimizer"
+    custom_system: "Optimize this task for performance."
+    input:
+      task: "${task}"
+    output: "optimized_task"
+    on_success: "__end__"
+
+  # ── Step 9: Final merge ──
+  final_merge:
+    type: "model"
+    tier: "architect"
+    identity: "architect"
+    custom_system: "Merge all results into a final deliverable."
+    input:
+      frontend: "${frontend_result}"
+      backend: "${backend_result}"
+      tests: "${test_result}"
+      optimized: "${optimized_tasks}"
+    output: "final"
+    on_success: "save_result"
+
+  save_result:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "result"
+        value: "${final}"
+    on_success: "__end__"

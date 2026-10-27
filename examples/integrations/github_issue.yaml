@@ -1,0 +1,76 @@
+id: github_issue_creator
+name: "GitHub Issue Creator"
+version: "1.0.0"
+description: "Create a GitHub issue from structured input data"
+
+config:
+  default_tier: "default"
+  timeout: 30
+
+variables:
+  github_token:
+    type: string
+    required: true
+  repo_owner:
+    type: string
+    required: true
+  repo_name:
+    type: string
+    required: true
+  issue_title:
+    type: string
+    required: true
+  issue_body:
+    type: string
+    required: true
+  issue_labels:
+    type: any
+    default: ["automated"]
+
+entry: build_payload
+
+nodes:
+  build_payload:
+    type: transform
+    mapping:
+      title: "${issue_title}"
+      body: "${issue_body}"
+      labels: "${issue_labels}"
+    output: issue_payload
+    on_success: create_issue
+
+  create_issue:
+    type: http_request
+    url: "https://api.github.com/repos/${repo_owner}/${repo_name}/issues"
+    method: POST
+    headers:
+      Authorization: "Bearer ${github_token}"
+      Accept: "application/vnd.github.v3+json"
+    body: "${issue_payload}"
+    output: create_result
+    on_success: extract_result
+    on_error: handle_failure
+
+  extract_result:
+    type: transform
+    input: "${create_result.body}"
+    mapping:
+      issue_number: "$.number"
+      issue_url: "$.html_url"
+      issue_state: "$.state"
+    output: issue_result
+    on_success: done
+
+  done:
+    type: state
+    actions:
+      - action: set
+        target: created_issue
+        value: "${issue_result}"
+
+  handle_failure:
+    type: state
+    actions:
+      - action: set
+        target: creation_status
+        value: "failed"

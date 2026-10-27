@@ -1,0 +1,98 @@
+id: "delegation_flow"
+name: "Delegation Flow"
+version: "1.0.0"
+description: "Orchestrator delegates to reviewer and developer"
+
+tiers:
+  orchestrator:
+    description: "High-level coordination"
+    max_concurrency: 1
+    timeout: 120
+
+  reviewer:
+    description: "Task review and guidance"
+    max_concurrency: 3
+
+  developer:
+    description: "Code generation"
+    max_concurrency: 5
+
+config:
+  default_tier: "orchestrator"
+  role: "coordinator"
+  thread_scope: true
+
+variables:
+  task:
+    type: "object"
+    required: true
+
+blackboard:
+  enabled: true
+  visibility:
+    orchestrator: "all"
+    reviewer: "observations"
+    developer: "recent_5"
+
+entry: "analyze_task"
+
+nodes:
+  analyze_task:
+    type: "model"
+    tier: "orchestrator"
+    identity: "orchestrator"
+    custom_system: "Analyze the task and decide if it needs review or direct code generation."
+    input:
+      task: "${task}"
+    output: "decision"
+    on_success: "route_decision"
+
+  route_decision:
+    type: "branch"
+    mode: "expression"
+    conditions:
+      - when: "${decision.needs_review} == true"
+        goto: "reviewer_review"
+      - when: "${decision.needs_code} == true"
+        goto: "developer_codegen"
+      - otherwise: "finalize"
+
+  reviewer_review:
+    type: "model"
+    tier: "reviewer"
+    identity: "reviewer"
+    custom_system: "Review the task and provide guidance."
+    input:
+      task: "${task}"
+    output: "review_result"
+    on_success: "developer_codegen"
+
+  developer_codegen:
+    type: "model"
+    tier: "developer"
+    identity: "developer"
+    custom_system: "Generate code based on the task and review."
+    input:
+      task: "${task}"
+      review: "${review_result}"
+    output: "code_result"
+    on_success: "merge_results"
+
+  merge_results:
+    type: "model"
+    tier: "orchestrator"
+    identity: "orchestrator"
+    custom_system: "Merge the results into a final output."
+    input:
+      review: "${review_result}"
+      code: "${code_result}"
+    output: "final_result"
+    on_success: "finalize"
+
+  finalize:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "result"
+        value: "${final_result}"
+    on_success: "__end__"

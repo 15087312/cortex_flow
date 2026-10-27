@@ -1,0 +1,174 @@
+id: "order_processing"
+name: "订单处理工作流"
+description: "演示状态管理、条件分支、循环、并行执行等核心功能"
+version: "1.0.0"
+
+config:
+  default_tier: "default"
+
+variables:
+  order_id:
+    type: "string"
+    required: true
+  customer_level:
+    type: "string"
+    required: true
+  total_amount:
+    type: "number"
+    required: true
+
+entry: "validate_order"
+
+nodes:
+  # 1. 验证订单
+  validate_order:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "order_valid"
+        value: true
+      - action: "set"
+        target: "processing_steps"
+        value: []
+      - action: "append"
+        target: "processing_steps"
+        value: "validated"
+    on_success: "check_customer_level"
+
+  # 2. 根据客户等级分支
+  check_customer_level:
+    type: "branch"
+    mode: "expression"
+    conditions:
+      - when: "${customer_level} == 'vip'"
+        goto: "vip_discount"
+      - when: "${customer_level} == 'premium'"
+        goto: "premium_discount"
+      - otherwise: "standard_processing"
+
+  # 3a. VIP 折扣
+  vip_discount:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "discount_rate"
+        value: 0.2
+      - action: "set"
+        target: "discount_amount"
+        value: "${total_amount} * 0.2"
+      - action: "append"
+        target: "processing_steps"
+        value: "vip_discount_applied"
+    on_success: "calculate_final_amount"
+
+  # 3b. Premium 折扣
+  premium_discount:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "discount_rate"
+        value: 0.1
+      - action: "set"
+        target: "discount_amount"
+        value: "${total_amount} * 0.1"
+      - action: "append"
+        target: "processing_steps"
+        value: "premium_discount_applied"
+    on_success: "calculate_final_amount"
+
+  # 3c. 标准处理
+  standard_processing:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "discount_rate"
+        value: 0
+      - action: "set"
+        target: "discount_amount"
+        value: 0
+      - action: "append"
+        target: "processing_steps"
+        value: "standard_pricing"
+    on_success: "calculate_final_amount"
+
+  # 4. 计算最终金额
+  calculate_final_amount:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "final_amount"
+        value: "${total_amount} - ${discount_amount}"
+      - action: "append"
+        target: "processing_steps"
+        value: "amount_calculated"
+    on_success: "parallel_checks"
+
+  # 5. 并行执行库存检查和风控检查
+  parallel_checks:
+    type: "parallel"
+    branches:
+      - "inventory_check"
+      - "risk_assessment"
+    strategy: "all"
+    on_success: "process_items"
+
+  # 5a. 库存检查
+  inventory_check:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "inventory_status"
+        value: "in_stock"
+      - action: "set"
+        target: "warehouse_location"
+        value: "WH-001"
+    on_success: "__end__"
+
+  # 5b. 风控评估
+  risk_assessment:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "risk_score"
+        value: 15
+      - action: "set"
+        target: "risk_level"
+        value: "low"
+    on_success: "__end__"
+
+  # 6. 处理商品列表（循环）
+  process_items:
+    type: "loop"
+    loop_mode: "foreach"
+    items: "${order_items}"
+    item_var: "current_item"
+    index_var: "item_index"
+    body: "process_single_item"
+    on_success: "generate_invoice"
+
+  # 6a. 处理单个商品（循环体）
+  process_single_item:
+    type: "state"
+    actions:
+      - action: "append"
+        target: "processed_items"
+        value: "${current_item}"
+    on_success: "__end__"
+
+  # 7. 生成发票
+  generate_invoice:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "invoice_id"
+        value: "INV-${order_id}"
+      - action: "set"
+        target: "invoice_amount"
+        value: "${final_amount}"
+      - action: "set"
+        target: "result"
+        value: "${invoice_id}"
+      - action: "append"
+        target: "processing_steps"
+        value: "invoice_generated"
+    on_success: "__end__"

@@ -1,0 +1,407 @@
+id: "auto_video_edit_resolve"
+name: "Auto Video Editor (DaVinci Resolve)"
+version: "1.0.0"
+description: >
+  Automated video editing workflow using DaVinci Resolve as the editing backend.
+  AI-driven scene analysis, intelligent editing decisions, subtitle generation,
+  color grading, and final render — all through Resolve's scripting API.
+
+tiers:
+  analyzer:
+    description: "Scene analysis and classification"
+    model: "gpt-4o"
+    max_concurrency: 2
+    timeout: 60
+
+  editor:
+    description: "Video editing decisions"
+    model: "gpt-4o-mini"
+    max_concurrency: 4
+
+  subtitle:
+    description: "Subtitle generation"
+    model: "gpt-4o-mini"
+    max_concurrency: 2
+
+config:
+  default_tier: "analyzer"
+  role: "video_editor"
+  thread_scope: true
+
+blackboard:
+  enabled: true
+  visibility:
+    analyzer: "all"
+    editor: "recent_10"
+
+variables:
+  video_path:
+    type: "string"
+    required: true
+    description: "Path to input video file"
+  output_path:
+    type: "string"
+    required: true
+    description: "Path for rendered output video"
+  style:
+    type: "string"
+    default: "cinematic"
+    enum: ["cinematic", "vlog", "tutorial", "highlights"]
+    description: "Editing style preset"
+
+entry: "connect_resolve"
+
+nodes:
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 0: Connect to DaVinci Resolve
+  # ═══════════════════════════════════════════════════════════════
+
+  connect_resolve:
+    type: "tool"
+    tool: "resolve_connect"
+    output: "resolve_info"
+    on_success: "extract_metadata"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 1: Pre-processing (external tools for analysis)
+  # ═══════════════════════════════════════════════════════════════
+
+  extract_metadata:
+    type: "tool"
+    tool: "ffprobe"
+    args:
+      input: "${video_path}"
+      show_format: true
+      show_streams: true
+    output: "metadata"
+    on_success: "extract_audio"
+
+  extract_audio:
+    type: "tool"
+    tool: "ffmpeg_extract_audio"
+    args:
+      input: "${video_path}"
+      output: "/tmp/audio_extracted.wav"
+      codec: "pcm_s16le"
+    output: "audio_path"
+    on_success: "detect_scenes"
+
+  detect_scenes:
+    type: "tool"
+    tool: "ffmpeg_detect_scenes"
+    args:
+      input: "${video_path}"
+      threshold: 0.3
+      output_format: "json"
+    output: "scene_list"
+    on_success: "transcribe_audio"
+
+  transcribe_audio:
+    type: "tool"
+    tool: "whisper_transcribe"
+    args:
+      audio: "${audio_path.path}"
+      language: "auto"
+      word_timestamps: true
+      output_format: "json"
+    output: "transcript"
+    on_success: "resolve_import"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 2: Import into DaVinci Resolve + Create Timeline
+  # ═══════════════════════════════════════════════════════════════
+
+  resolve_import:
+    type: "tool"
+    tool: "resolve_import_media"
+    args:
+      file_paths: "${video_path}"
+    output: "resolve_media"
+    on_success: "resolve_create_timeline"
+
+  resolve_create_timeline:
+    type: "tool"
+    tool: "resolve_create_timeline"
+    args:
+      name: "AutoEdit_${style}"
+    output: "resolve_timeline"
+    on_success: "prepare_editing_plan"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 3: AI Analysis & Planning
+  # ═══════════════════════════════════════════════════════════════
+
+  prepare_editing_plan:
+    type: "model"
+    tier: "analyzer"
+    identity: "video_analyst"
+    custom_system: |
+      You are a professional video editor AI. Analyze the scene breakdown and transcript
+      to create an editing plan. For each scene, decide:
+      - keep: Scene is good as-is
+      - trim: Scene needs trimming (specify start/end offsets in seconds)
+      - cut: Scene should be removed entirely
+      - transition: Add transition effect before this scene (specify type: Cross Dissolve, Smooth Cut, Additive Dissolve)
+
+      Consider the editing style: ${style}
+      Return JSON: { scenes: [{ index, action, trim_start?, trim_end?, transition_type? }], summary }
+    input:
+      scenes: "${scene_list}"
+      transcript: "${transcript}"
+      metadata: "${metadata}"
+      style: "${style}"
+    output_format: "json"
+    output: "editing_plan"
+    on_success: "classify_scenes"
+
+  classify_scenes:
+    type: "model"
+    tier: "editor"
+    identity: "scene_classifier"
+    custom_system: |
+      Classify each video scene into one of these categories:
+      - talking_head: Person speaking to camera
+      - b_roll: Supplementary footage
+      - action: Dynamic movement/action sequence
+      - transition_scene: Scene change or intro/outro
+      - demo: Screen recording or demonstration
+
+      Return JSON array: [{ index, category, confidence, notes }]
+    input:
+      scenes: "${scene_list}"
+      transcript: "${transcript}"
+    output_format: "json"
+    output: "scene_classifications"
+    on_success: "process_all_scenes"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 4: Scene Processing via Resolve (Loop)
+  # ═══════════════════════════════════════════════════════════════
+
+  process_all_scenes:
+    type: "loop"
+    loop_mode: "foreach"
+    items: "${scene_list.scenes}"
+    item_var: "current_scene"
+    index_var: "scene_index"
+    body: "route_scene_action"
+    max_iterations: 500
+    on_complete: "generate_subtitles"
+
+  # Route to appropriate Resolve action based on AI decision
+  route_scene_action:
+    type: "branch"
+    mode: "expression"
+    conditions:
+      - when: "${editing_plan.scenes[scene_index].action} == cut"
+        goto: "skip_scene"
+      - when: "${editing_plan.scenes[scene_index].action} == trim"
+        goto: "resolve_trim_scene"
+      - when: "${editing_plan.scenes[scene_index].action} == transition"
+        goto: "resolve_add_transition_scene"
+      - otherwise: "resolve_keep_scene"
+
+  # Keep scene: add clip to timeline as-is
+  resolve_keep_scene:
+    type: "tool"
+    tool: "resolve_add_clip_to_timeline"
+    args:
+      media_path: "${video_path}"
+      track_index: 1
+      position: "${current_scene.start}"
+      duration: "${current_scene.duration}"
+    output: "clip_result"
+    on_success: "record_scene_result"
+
+  # Trim scene: add clip then trim in/out points
+  resolve_trim_scene:
+    type: "tool"
+    tool: "resolve_add_clip_to_timeline"
+    args:
+      media_path: "${video_path}"
+      track_index: 1
+      position: "${current_scene.start}"
+      duration: "${current_scene.duration}"
+    output: "clip_result"
+    on_success: "apply_trim"
+
+  apply_trim:
+    type: "tool"
+    tool: "resolve_trim_clip"
+    args:
+      clip_index: "${scene_index}"
+      trim_start: "${editing_plan.scenes[scene_index].trim_start}"
+      trim_end: "${editing_plan.scenes[scene_index].trim_end}"
+    output: "trim_result"
+    on_success: "record_scene_result"
+
+  # Add clip with transition
+  resolve_add_transition_scene:
+    type: "tool"
+    tool: "resolve_add_clip_to_timeline"
+    args:
+      media_path: "${video_path}"
+      track_index: 1
+      position: "${current_scene.start}"
+      duration: "${current_scene.duration}"
+    output: "clip_result"
+    on_success: "apply_transition"
+
+  apply_transition:
+    type: "tool"
+    tool: "resolve_add_transition"
+    args:
+      clip_index: "${scene_index}"
+      transition_type: "${editing_plan.scenes[scene_index].transition_type}"
+      duration_frames: 30
+    output: "transition_result"
+    on_success: "record_scene_result"
+
+  # Skip scene (cut) — don't add to timeline
+  skip_scene:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "clip_result"
+        value: null
+    on_success: "record_scene_result"
+
+  # Record result for this scene
+  record_scene_result:
+    type: "transform"
+    mapping:
+      scene_index: "${scene_index}"
+      scene_data: "${current_scene}"
+      clip_info: "${clip_result}"
+      action: "${editing_plan.scenes[scene_index].action}"
+      classification: "${scene_classifications[scene_index]}"
+    output: "processed_scene"
+    on_success: "append_processed_scenes"
+
+  # Append to processed scenes list
+  append_processed_scenes:
+    type: "state"
+    actions:
+      - action: "append"
+        target: "processed_scenes"
+        value: "${processed_scene}"
+    on_success: "__end__"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 5: Subtitles via Resolve
+  # ═══════════════════════════════════════════════════════════════
+
+  generate_subtitles:
+    type: "model"
+    tier: "subtitle"
+    identity: "subtitle_generator"
+    custom_system: |
+      Generate SRT subtitle content from the transcript.
+      Style: ${style}
+      - cinematic: Minimal, elegant positioning
+      - vlog: Bold, colorful, centered
+      - tutorial: Clear, step-by-step, with highlights
+      - highlights: Punchy, short phrases
+
+      Return SRT format with timing from transcript timestamps.
+    input:
+      transcript: "${transcript}"
+      style: "${style}"
+      scene_classifications: "${scene_classifications}"
+    output: "subtitle_content"
+    on_success: "resolve_add_subtitles"
+
+  resolve_add_subtitles:
+    type: "tool"
+    tool: "resolve_add_subtitles"
+    args:
+      srt_content: "${subtitle_content}"
+      track_index: 1
+    output: "subtitle_result"
+    on_success: "apply_color_grading"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 6: Color Grading via Resolve
+  # ═══════════════════════════════════════════════════════════════
+
+  apply_color_grading:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "grade_results"
+        value: []
+    on_success: "grade_loop"
+
+  grade_loop:
+    type: "loop"
+    loop_mode: "count"
+    count: 5
+    body: "apply_grade_to_clip"
+    on_complete: "resolve_render"
+
+  apply_grade_to_clip:
+    type: "tool"
+    tool: "resolve_set_color_grade"
+    args:
+      clip_index: "${iteration}"
+      preset: "${style}"
+    output: "grade_result"
+    on_success: "__end__"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 7: Render & Summary
+  # ═══════════════════════════════════════════════════════════════
+
+  resolve_render:
+    type: "tool"
+    tool: "resolve_render"
+    args:
+      output_path: "${output_path}"
+      preset: "H.264 Master"
+    output: "render_result"
+    on_success: "get_final_info"
+
+  get_final_info:
+    type: "tool"
+    tool: "resolve_get_timeline_info"
+    output: "final_timeline_info"
+    on_success: "generate_summary"
+
+  generate_summary:
+    type: "model"
+    tier: "analyzer"
+    identity: "report_generator"
+    custom_system: |
+      Generate a brief editing summary report including:
+      - Original video duration
+      - Final timeline duration
+      - Number of scenes processed
+      - Actions taken (kept, trimmed, cut, transitions added)
+      - Subtitle count
+      - Output file path
+      - DaVinci Resolve version used
+
+      Format as a clean markdown report.
+    input:
+      metadata: "${metadata}"
+      editing_plan: "${editing_plan}"
+      processed_scenes: "${processed_scenes}"
+      subtitle_count: "${subtitle_content}"
+      output_path: "${output_path}"
+      resolve_info: "${resolve_info}"
+      final_timeline_info: "${final_timeline_info}"
+    output: "summary_report"
+    on_success: "save_result"
+
+  save_result:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "result"
+        value:
+          output_video: "${output_path}"
+          summary: "${summary_report}"
+          scenes_processed: "${processed_scenes}"
+          resolve_version: "${resolve_info}"
+          timeline_info: "${final_timeline_info}"
+    on_success: "__end__"

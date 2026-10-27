@@ -1,0 +1,367 @@
+id: "auto_video_edit"
+name: "Auto Video Editor"
+version: "1.0.0"
+description: >
+  Automated video editing workflow: scene detection, AI classification,
+  intelligent trimming, subtitle generation, and final export.
+
+# ── Tiers ──
+tiers:
+  analyzer:
+    description: "Scene analysis and classification"
+    model: "gpt-4o"
+    max_concurrency: 2
+    timeout: 60
+
+  editor:
+    description: "Video editing decisions"
+    model: "gpt-4o-mini"
+    parent: "analyzer"
+    max_concurrency: 4
+
+  subtitle:
+    description: "Subtitle generation"
+    model: "gpt-4o-mini"
+    max_concurrency: 2
+
+config:
+  default_tier: "analyzer"
+  role: "video_editor"
+  thread_scope: true
+
+# ── Blackboard for shared state ──
+blackboard:
+  enabled: true
+  visibility:
+    analyzer: "all"
+    editor: "recent_10"
+    subtitle: "observations"
+
+# ── Input variables ──
+variables:
+  video_path:
+    type: "string"
+    required: true
+    description: "Path to input video file"
+  output_path:
+    type: "string"
+    required: true
+    description: "Path for output video file"
+  style:
+    type: "string"
+    default: "cinematic"
+    enum: ["cinematic", "vlog", "tutorial", "highlights"]
+    description: "Editing style preset"
+
+entry: "extract_metadata"
+
+nodes:
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 1: Pre-processing
+  # ═══════════════════════════════════════════════════════════════
+
+  # Extract video metadata (duration, resolution, fps)
+  extract_metadata:
+    type: "tool"
+    tool: "ffprobe"
+    args:
+      input: "${video_path}"
+      show_format: true
+      show_streams: true
+    output: "metadata"
+    on_success: "extract_audio"
+
+  # Extract audio track for transcription
+  extract_audio:
+    type: "tool"
+    tool: "ffmpeg_extract_audio"
+    args:
+      input: "${video_path}"
+      output: "/tmp/audio_extracted.wav"
+      codec: "pcm_s16le"
+    output: "audio_path"
+    on_success: "detect_scenes"
+
+  # Detect scene boundaries using scene change detection
+  detect_scenes:
+    type: "tool"
+    tool: "ffmpeg_detect_scenes"
+    args:
+      input: "${video_path}"
+      threshold: 0.3
+      output_format: "json"
+    output: "scene_list"
+    on_success: "transcribe_audio"
+
+  # Transcribe audio to text with timestamps
+  transcribe_audio:
+    type: "tool"
+    tool: "whisper_transcribe"
+    args:
+      audio: "${audio_path.path}"
+      language: "auto"
+      word_timestamps: true
+      output_format: "json"
+    output: "transcript"
+    on_success: "prepare_editing_plan"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 2: AI Analysis & Planning
+  # ═══════════════════════════════════════════════════════════════
+
+  # AI analyzes scenes and creates editing plan
+  prepare_editing_plan:
+    type: "model"
+    tier: "analyzer"
+    identity: "video_analyst"
+    custom_system: |
+      You are a professional video editor AI. Analyze the scene breakdown and transcript
+      to create an editing plan. For each scene, decide:
+      - keep: Scene is good as-is
+      - trim: Scene needs trimming (specify start/end offsets)
+      - cut: Scene should be removed entirely
+      - transition: Add transition effect before this scene
+
+      Consider the editing style: ${style}
+      Return JSON: { scenes: [{ index, action, trim_start?, trim_end?, transition_type? }], summary }
+    input:
+      scenes: "${scene_list}"
+      transcript: "${transcript}"
+      metadata: "${metadata}"
+      style: "${style}"
+    output_format: "json"
+    output: "editing_plan"
+    on_success: "classify_scenes"
+
+  # Classify each scene type for style-specific processing
+  classify_scenes:
+    type: "model"
+    tier: "editor"
+    identity: "scene_classifier"
+    custom_system: |
+      Classify each video scene into one of these categories:
+      - talking_head: Person speaking to camera
+      - b_roll: Supplementary footage
+      - action: Dynamic movement/action sequence
+      - transition_scene: Scene change or intro/outro
+      - demo: Screen recording or demonstration
+
+      Return JSON array: [{ index, category, confidence, notes }]
+    input:
+      scenes: "${scene_list}"
+      transcript: "${transcript}"
+    output_format: "json"
+    output: "scene_classifications"
+    on_success: "process_all_scenes"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 3: Scene Processing (Loop)
+  # ═══════════════════════════════════════════════════════════════
+
+  # Loop through each scene and process it
+  process_all_scenes:
+    type: "loop"
+    loop_mode: "foreach"
+    items: "${scene_list.scenes}"
+    item_var: "current_scene"
+    index_var: "scene_index"
+    body: "route_scene_action"
+    max_iterations: 500
+    on_complete: "generate_subtitles"
+
+  # Route to appropriate action based on editing plan
+  route_scene_action:
+    type: "branch"
+    mode: "expression"
+    conditions:
+      - when: "${editing_plan.scenes[scene_index].action} == cut"
+        goto: "skip_scene"
+      - when: "${editing_plan.scenes[scene_index].action} == trim"
+        goto: "trim_scene"
+      - when: "${editing_plan.scenes[scene_index].action} == transition"
+        goto: "add_transition"
+      - otherwise: "keep_scene"
+
+  # Keep scene as-is (just extract to temp file)
+  keep_scene:
+    type: "tool"
+    tool: "ffmpeg_extract_segment"
+    args:
+      input: "${video_path}"
+      start: "${current_scene.start}"
+      duration: "${current_scene.duration}"
+      output: "/tmp/scene_${scene_index}.mp4"
+    output: "scene_output"
+    on_success: "record_scene_result"
+
+  # Trim scene based on AI decision
+  trim_scene:
+    type: "tool"
+    tool: "ffmpeg_extract_segment"
+    args:
+      input: "${video_path}"
+      start: "${current_scene.start}"
+      duration: "${current_scene.duration}"
+      trim_start: "${editing_plan.scenes[scene_index].trim_start}"
+      trim_end: "${editing_plan.scenes[scene_index].trim_end}"
+      output: "/tmp/scene_${scene_index}.mp4"
+    output: "scene_output"
+    on_success: "record_scene_result"
+
+  # Add transition effect
+  add_transition:
+    type: "tool"
+    tool: "ffmpeg_add_transition"
+    args:
+      input: "${video_path}"
+      start: "${current_scene.start}"
+      duration: "${current_scene.duration}"
+      transition_type: "${editing_plan.scenes[scene_index].transition_type}"
+      transition_duration: 0.5
+      output: "/tmp/scene_${scene_index}.mp4"
+    output: "scene_output"
+    on_success: "record_scene_result"
+
+  # Skip scene (marked for cutting)
+  skip_scene:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "scene_output"
+        value: null
+    output: "scene_output"
+    on_success: "record_scene_result"
+
+  # Record result for this scene
+  record_scene_result:
+    type: "transform"
+    mapping:
+      scene_index: "${scene_index}"
+      scene_data: "${current_scene}"
+      output_file: "${scene_output}"
+      action: "${editing_plan.scenes[scene_index].action}"
+      classification: "${scene_classifications[scene_index]}"
+    output: "processed_scene"
+    on_success: "append_processed_scenes"
+
+  # Append to processed scenes list
+  append_processed_scenes:
+    type: "state"
+    actions:
+      - action: "append"
+        target: "processed_scenes"
+        value: "${processed_scene}"
+    on_success: "__end__"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 4: Subtitle Generation
+  # ═══════════════════════════════════════════════════════════════
+
+  # Generate styled subtitles from transcript
+  generate_subtitles:
+    type: "model"
+    tier: "subtitle"
+    identity: "subtitle_generator"
+    custom_system: |
+      Generate SRT subtitle content from the transcript.
+      Style: ${style}
+      - cinematic: Minimal, elegant positioning
+      - vlog: Bold, colorful, centered
+      - tutorial: Clear, step-by-step, with highlights
+      - highlights: Punchy, short phrases
+
+      Return SRT format with timing from transcript timestamps.
+    input:
+      transcript: "${transcript}"
+      style: "${style}"
+      scene_classifications: "${scene_classifications}"
+    output: "subtitle_content"
+    on_success: "write_subtitle_file"
+
+  # Write subtitle file
+  write_subtitle_file:
+    type: "tool"
+    tool: "write_file"
+    args:
+      path: "/tmp/subtitles.srt"
+      content: "${subtitle_content}"
+    output: "subtitle_file"
+    on_success: "concatenate_scenes"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 5: Final Assembly
+  # ═══════════════════════════════════════════════════════════════
+
+  # Concatenate all processed scenes
+  concatenate_scenes:
+    type: "tool"
+    tool: "ffmpeg_concat"
+    args:
+      segments: "${processed_scenes}"
+      output: "/tmp/concatenated.mp4"
+      reencode: true
+    output: "concatenated_video"
+    on_success: "burn_subtitles"
+
+  # Burn subtitles into video
+  burn_subtitles:
+    type: "tool"
+    tool: "ffmpeg_burn_subtitles"
+    args:
+      input: "${concatenated_video.path}"
+      subtitle_file: "${subtitle_file.path}"
+      style: "${style}"
+      output: "/tmp/subtitled.mp4"
+    output: "subtitled_video"
+    on_success: "apply_color_grade"
+
+  # Apply color grading based on style
+  apply_color_grade:
+    type: "tool"
+    tool: "ffmpeg_color_grade"
+    args:
+      input: "${subtitled_video.path}"
+      preset: "${style}"
+      output: "${output_path}"
+    output: "final_video"
+    on_success: "generate_summary"
+
+  # ═══════════════════════════════════════════════════════════════
+  # Phase 6: Summary & Cleanup
+  # ═══════════════════════════════════════════════════════════════
+
+  # Generate editing summary report
+  generate_summary:
+    type: "model"
+    tier: "analyzer"
+    identity: "report_generator"
+    custom_system: |
+      Generate a brief editing summary report including:
+      - Original video duration
+      - Final video duration
+      - Number of scenes processed
+      - Actions taken (kept, trimmed, cut, transitions added)
+      - Subtitle count
+      - Output file path
+
+      Format as a clean markdown report.
+    input:
+      metadata: "${metadata}"
+      editing_plan: "${editing_plan}"
+      processed_scenes: "${processed_scenes}"
+      subtitle_count: "${subtitle_content}"
+      output_path: "${output_path}"
+    output: "summary_report"
+    on_success: "save_result"
+
+  # Save final result
+  save_result:
+    type: "state"
+    actions:
+      - action: "set"
+        target: "result"
+        value:
+          output_video: "${output_path}"
+          summary: "${summary_report}"
+          scenes_processed: "${processed_scenes}"
+    on_success: "__end__"

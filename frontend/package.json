@@ -1,0 +1,26 @@
+{
+  "name": "cortexflow-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0",
+    "pinia": "^2.3.1",
+    "js-yaml": "^4.1.0",
+    "@codemirror/view": "^6.34.3",
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-yaml": "^6.1.2",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/state": "^6.4.1"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5",
+    "@vitejs/plugin-vue": "^5.2.3"
+  }
+}
