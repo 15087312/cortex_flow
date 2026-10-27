@@ -172,6 +172,7 @@ async def _execute_workflow(engine: Engine, workflow_id: str,
 
 
 async def _on_event(event: Event) -> None:
+    """Fan one bus event out to every connected websocket."""
     for eq in _event_queues:
         try:
             eq.put_nowait(event)
@@ -180,6 +181,37 @@ async def _on_event(event: Event) -> None:
 
 
 _event_queues: list[asyncio.Queue] = []
+_bus_subscribed = False
+
+
+async def _ensure_event_subscription() -> None:
+    """Subscribe the fan-out handler once, not once per websocket.
+
+    Subscribing per connection made every client receive N copies of each
+    event when N sockets were open.
+    """
+    global _bus_subscribed
+    if not _bus_subscribed:
+        await _get_engine().event_bus.subscribe("*", _on_event)
+        _bus_subscribed = True
+
+
+async def _pump_events(queue: asyncio.Queue, websocket: WebSocket) -> None:
+    while True:
+        event = await queue.get()
+        await websocket.send_json({
+            "type": event.type,
+            "payload": event.payload,
+            "timestamp": event.timestamp.isoformat(),
+        })
+
+
+async def _watch_disconnect(websocket: WebSocket) -> None:
+    """Detect client close so idle connections clean up their queue."""
+    while True:
+        message = await websocket.receive()
+        if message["type"] == "websocket.disconnect":
+            return
 
 
 class WorkflowCreate(BaseModel):
@@ -421,23 +453,21 @@ async def event_stream(websocket: WebSocket):
     await websocket.accept()
     queue: asyncio.Queue[Event] = asyncio.Queue(maxsize=100)
     _event_queues.append(queue)
+    await _ensure_event_subscription()
 
-    engine = _get_engine()
-    await engine.event_bus.subscribe("*", _on_event)
+    pump = asyncio.create_task(_pump_events(queue, websocket))
+    watch = asyncio.create_task(_watch_disconnect(websocket))
 
     try:
-        while True:
-            event = await queue.get()
-            await websocket.send_json({
-                "type": event.type,
-                "payload": event.payload,
-                "timestamp": event.timestamp.isoformat(),
-            })
+        await asyncio.wait({pump, watch}, return_when=asyncio.FIRST_COMPLETED)
     except WebSocketDisconnect:
         pass
     finally:
-        _event_queues.remove(queue)
-        await engine.event_bus.unsubscribe("*", _on_event)
+        for task in (pump, watch):
+            task.cancel()
+        await asyncio.gather(pump, watch, return_exceptions=True)
+        if queue in _event_queues:
+            _event_queues.remove(queue)
 
 
 class MemoryStoreRequest(BaseModel):

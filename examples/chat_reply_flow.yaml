@@ -1,0 +1,25 @@
+id: chat_reply
+name: 对话回复示例（消息节点）
+version: 1.0.0
+description: 演示 message 节点把结果实时推送到对话界面
+config:
+  default_tier: default
+  role: assistant
+variables:
+  name:
+    type: string
+    required: true
+    default: 世界
+    description: 用户名字
+entry: greet
+nodes:
+  greet:
+    type: message
+    role: assistant
+    message: "你好，${name}！这条消息由 message 节点实时推送到对话界面。"
+    output: greeting
+    on_success: done
+  done:
+    type: end
+    end_mode: variable
+    return_value: ${greeting}

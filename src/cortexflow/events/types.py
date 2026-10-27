@@ -32,6 +32,9 @@ class EventType:
     FLOW_SUSPENDED = "flow.suspended"
     FLOW_RESUMED = "flow.resumed"
 
+    # Chat events
+    MESSAGE = "flow.message"
+
     # External events
     USER_INPUT = "external.user_input"
     APPROVAL_GRANTED = "external.approval_granted"

@@ -37,6 +37,7 @@ class NodeType(str, Enum):
     CODE = "code"
     DATABASE = "database"
     TEXT = "text"
+    MESSAGE = "message"
 
 
 class OutputFormat(str, Enum):
@@ -261,6 +262,9 @@ class NodeDefinition(BaseModel):
     # Text node fields (string processing)
     text_action: str | None = Field(default=None)
     text_args: dict[str, Any] = Field(default_factory=dict)
+
+    # Message node fields (chat output; reuses 'message' above)
+    role: str = Field(default="assistant")  # assistant | user | system
 
     # Memory node fields
     memory_action: str | None = Field(default=None)  # "store" or "query"

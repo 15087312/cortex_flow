@@ -34,6 +34,7 @@ const nodeTypes = [
   { type: 'ask', name: '追问节点', icon: 'help-circle', desc: '挂起提问等人答', snippet: '  confirm:\n    type: ask\n    question: "确认执行吗？(yes/no)"\n    output: confirmed\n    on_event: next_step' },
   { type: 'code', name: '代码节点', icon: 'code', desc: '运行 Python 片段', snippet: '  compute:\n    type: code\n    inputs:\n      numbers: "${numbers}"\n    code: |\n      total = sum(numbers)\n      output = {"total": total}\n    output: stats' },
   { type: 'database', name: '数据库节点', icon: 'database', desc: 'SQLite 增删改查', snippet: '  save_row:\n    type: database\n    db_action: insert\n    table: orders\n    values:\n      order_id: "${order_id}"\n      amount: "${total}"\n    output: saved' },
+  { type: 'message', name: '消息节点', icon: 'message-circle', desc: '向对话推送消息', snippet: '  reply:\n    type: message\n    role: assistant\n    message: "已处理 ${count} 条记录"\n    output: reply_text' },
   { type: 'text', name: '文本处理', icon: 'text', desc: '字符串/正则/JSON', snippet: '  clean:\n    type: text\n    text_action: replace\n    input: "${raw_text}"\n    text_args:\n      old: "\\n\\n"\n      new: "\\n"\n    output: cleaned' },
 ]
 

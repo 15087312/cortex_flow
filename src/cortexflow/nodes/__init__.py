@@ -16,6 +16,7 @@ from cortexflow.nodes.intent import IntentNode
 from cortexflow.nodes.loop import LoopNode
 from cortexflow.nodes.map import MapNode
 from cortexflow.nodes.memory import MemoryNode
+from cortexflow.nodes.message import MessageNode
 from cortexflow.nodes.model import ModelNode
 from cortexflow.nodes.parallel import ParallelNode
 from cortexflow.nodes.perception import PerceptionNode
@@ -46,6 +47,7 @@ __all__ = [
     "LoopNode",
     "MapNode",
     "MemoryNode",
+    "MessageNode",
     "ModelNode",
     "NodeRegistry",
     "ParallelNode",

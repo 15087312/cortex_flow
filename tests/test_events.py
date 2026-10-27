@@ -94,3 +94,23 @@ def test_event_type_constants():
     assert EventType.NODE_STARTED == "node.started"
     assert EventType.FLOW_COMPLETED == "flow.completed"
     assert EventType.FLOW_SUSPENDED == "flow.suspended"
+
+
+@pytest.mark.asyncio
+async def test_wildcard_subscriber_receives_every_event():
+    bus = EventBus()
+    seen = []
+    await bus.subscribe("*", lambda e: seen.append(e.type))
+    await bus.publish(Event(type="one"))
+    await bus.publish(Event(type="two"))
+    assert seen == ["one", "two"]
+
+
+@pytest.mark.asyncio
+async def test_specific_and_wildcard_handlers_both_fire_once():
+    bus = EventBus()
+    calls = []
+    await bus.subscribe("thing", lambda e: calls.append("specific"))
+    await bus.subscribe("*", lambda e: calls.append("wildcard"))
+    await bus.publish(Event(type="thing"))
+    assert calls == ["specific", "wildcard"]

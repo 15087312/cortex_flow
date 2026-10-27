@@ -213,6 +213,9 @@ function handleEvent(event) {
   const payload = event.payload || {}
   if (type === 'flow.started') {
     addMessage('system', '工作流已开始执行')
+  } else if (type === 'flow.message') {
+    addMessage(payload.role || 'assistant', payload.content || '',
+      payload.node_id ? `节点 ${payload.node_id}` : '')
   } else if (type === 'node.started') {
     addMessage('system', `执行节点: ${payload.node_id || ''} (${payload.node_type || ''})`)
   } else if (type === 'node.completed') {

@@ -21,9 +21,12 @@ class EventBus:
         self._waiters: dict[str, list[asyncio.Future]] = defaultdict(list)
 
     async def publish(self, event: Event) -> None:
-        """Publish event."""
+        """Publish event to type-specific and wildcard (``"*"``) handlers."""
         # Call handlers
-        for handler in self._handlers.get(event.type, []):
+        handlers = list(self._handlers.get(event.type, []))
+        if event.type != "*":
+            handlers.extend(self._handlers.get("*", []))
+        for handler in handlers:
             try:
                 if asyncio.iscoroutinefunction(handler):
                     await handler(event)

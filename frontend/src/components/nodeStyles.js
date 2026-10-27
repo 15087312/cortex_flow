@@ -25,6 +25,7 @@ export const NODE_COLORS = {
   code: { bg: '#1a2a3a', border: '#0ea5e9', text: '#7dd3fc' },
   database: { bg: '#1a2a2a', border: '#14b8a6', text: '#5eead4' },
   text: { bg: '#2a2a3a', border: '#818cf8', text: '#c7d2fe' },
+  message: { bg: '#1a3a2a', border: '#10b981', text: '#6ee7b7' },
 }
 
 export const NODE_ICONS = {
@@ -54,6 +55,7 @@ export const NODE_ICONS = {
   code: 'code',
   database: 'database',
   text: 'text',
+  message: 'message-circle',
 }
 
 export function getNodeStyle(type) {

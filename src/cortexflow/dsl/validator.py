@@ -198,6 +198,17 @@ class Validator:
             if node.type == NodeType.TEXT and not node.text_action:
                 raise ValidationError(f"Text node '{node_id}' missing 'text_action'")
 
+            if node.type == NodeType.MESSAGE and not node.message:
+                raise ValidationError(f"Message node '{node_id}' missing 'message'")
+            if node.type == NodeType.MESSAGE and node.role not in {
+                "assistant",
+                "user",
+                "system",
+            }:
+                raise ValidationError(
+                    f"Message node '{node_id}' has unknown role '{node.role}'"
+                )
+
     def _validate_variables(self, workflow: WorkflowDefinition) -> None:
         """Validate variable definitions."""
         for var_name, var_def in workflow.variables.items():

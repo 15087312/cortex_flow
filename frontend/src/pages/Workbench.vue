@@ -7,6 +7,7 @@ import FlowToolbar from '@/components/FlowToolbar.vue'
 import YamlEditor from '@/components/YamlEditor.vue'
 import WorkflowList from '@/components/WorkflowList.vue'
 import NodePalette from '@/components/NodePalette.vue'
+import NodeConfigPanel from '@/components/NodeConfigPanel.vue'
 import TemplateGallery from '@/components/TemplateGallery.vue'
 import VersionHistory from '@/components/VersionHistory.vue'
 import VariableConfig from '@/components/VariableConfig.vue'
@@ -207,6 +208,25 @@ function updateNodeSuccessor() {
   }
   graphEdges.value = edges
   syncGraphToYaml()
+}
+
+function updateSelectedNodeConfig(config) {
+  const node = graphNodes.value.find(n => n.id === selectedNode.value?.id)
+  if (!node) return
+  node.config = { ...config }
+  graphNodes.value = [...graphNodes.value]
+  selectedNode.value = node
+  syncGraphToYaml()
+}
+
+function onConfigConnect(target) {
+  selectedNodeSuccessor.value = target
+  updateNodeSuccessor()
+}
+
+function clearNodeSelection() {
+  selectedNode.value = null
+  selectedNodeSuccessor.value = ''
 }
 
 function deleteSelectedNode() {
@@ -534,20 +554,16 @@ onMounted(() => {
           @node-delete="onNodeDelete"
           @add-node="onAddNode" />
         <YamlEditor v-else v-model="editorContent" />
-      </div>
 
-      <!-- Node config panel (graph mode) -->
-      <div v-if="editMode === 'graph' && selectedNode"
-        style="padding: var(--space-sm) var(--space-lg); border-top: 1px solid var(--border); background: var(--bg-secondary); display: flex; align-items: center; gap: var(--space-md)">
-        <span style="font-size: var(--text-sm); font-weight: 600">{{ selectedNode.icon }} {{ selectedNode.id }}</span>
-        <span style="font-size: var(--text-xs); color: var(--text-muted)">{{ selectedNode.type }}</span>
-        <div style="flex: 1"></div>
-        <label style="font-size: var(--text-xs); color: var(--text-muted)">连接至:</label>
-        <select v-model="selectedNodeSuccessor" @change="updateNodeSuccessor" class="input" style="font-size: var(--text-xs)">
-          <option value="">(无)</option>
-          <option v-for="n in graphNodes" :key="n.id" :value="n.id" :disabled="n.id === selectedNode.id">{{ n.id }}</option>
-        </select>
-        <button class="btn btn-sm" style="color: var(--danger)" @click="deleteSelectedNode">删除节点</button>
+        <!-- Node config panel (graph mode) -->
+        <NodeConfigPanel v-if="editMode === 'graph' && selectedNode"
+          :node="selectedNode"
+          :node-ids="graphNodes.map(n => n.id)"
+          :successor="selectedNodeSuccessor"
+          @update="updateSelectedNodeConfig"
+          @connect="onConfigConnect"
+          @close="clearNodeSelection"
+          @delete="deleteSelectedNode" />
       </div>
 
       <!-- Validation panel (yaml mode) -->

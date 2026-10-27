@@ -134,6 +134,7 @@ textarea.input { resize: vertical; min-height: 60px; font-family: var(--font-mon
 .chat-message .msg-bubble { max-width: 80%; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); font-size: var(--text-base); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .chat-message.user { display: flex; justify-content: flex-end; }
 .chat-message.user .msg-bubble { background: var(--accent); color: var(--text-inverse); }
+.chat-message.assistant .msg-bubble { background: var(--bg-tertiary); color: var(--text-primary); }
 .chat-message.system .msg-bubble { background: var(--bg-tertiary); color: var(--text-secondary); }
 .chat-message.result .msg-bubble { background: var(--success-bg); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.2); }
 .chat-message.error .msg-bubble { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }

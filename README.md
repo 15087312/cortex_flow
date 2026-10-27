@@ -23,6 +23,7 @@
 | 流程控制 | `wait` / `ask` / `end` / `break` / `continue` / `aggregate` | 事件挂起、人工追问、结束、循环控制、分支收敛 |
 | 数据 | `state` / `transform` / `text` / `code` / `database` | 变量读写、结构映射、字符串处理、Python 片段、SQLite 增删改查 |
 | 集成 | `http_request` / `retrieval` / `memory` / `perception` | HTTP 调用、知识库检索、长期记忆、感知输入 |
+| 对话 | `message` | 向对话界面实时推送消息（`flow.message` 事件） |
 | 路由 | `intent` | 关键词意图分流 |
 
 新增的 Coze 风格节点示例见 [examples/data_processing_flow.yaml](./examples/data_processing_flow.yaml)。
