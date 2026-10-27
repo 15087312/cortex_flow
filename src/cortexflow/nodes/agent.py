@@ -44,7 +44,7 @@ class AgentNode(BaseNode):
                     temperature=defn.temperature,
                 )
                 response = result.get("output", "") if isinstance(result, dict) else str(result)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 response = f"[LLM 调用失败: {e}]"
         else:
             response = f"[{agent.name}] Acknowledged: {resolved_message}"

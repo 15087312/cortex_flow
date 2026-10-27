@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from cortexflow.adapters.base import ToolRuntimeAdapter
 
@@ -49,7 +50,7 @@ class RegistryToolAdapter(ToolRuntimeAdapter):
         except TypeError as e:
             try:
                 result = func(args) if args else func()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 raise ValueError(f"Tool {tool_name} argument error: {e}") from e
 
         return {

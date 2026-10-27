@@ -1,21 +1,21 @@
 """RAG (Retrieval-Augmented Generation) system."""
 
-from cortexflow.rag.document import Document, Chunk
-from cortexflow.rag.loader import TextLoader, FileLoader, DirectoryLoader, JSONLoader, CSVLoader
-from cortexflow.rag.splitter import TextSplitter, RecursiveTextSplitter, SemanticSplitter
+from cortexflow.rag.document import Chunk, Document
+from cortexflow.rag.loader import CSVLoader, DirectoryLoader, FileLoader, JSONLoader, TextLoader
 from cortexflow.rag.pipeline import DocumentStore, RAGPipeline
+from cortexflow.rag.splitter import RecursiveTextSplitter, SemanticSplitter, TextSplitter
 
 __all__ = [
-    "Document",
-    "Chunk",
-    "TextLoader",
-    "FileLoader",
-    "DirectoryLoader",
-    "JSONLoader",
     "CSVLoader",
-    "TextSplitter",
+    "Chunk",
+    "DirectoryLoader",
+    "Document",
+    "DocumentStore",
+    "FileLoader",
+    "JSONLoader",
+    "RAGPipeline",
     "RecursiveTextSplitter",
     "SemanticSplitter",
-    "DocumentStore",
-    "RAGPipeline",
+    "TextLoader",
+    "TextSplitter",
 ]

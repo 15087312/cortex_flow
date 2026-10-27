@@ -189,7 +189,6 @@ class NodeDefinition(BaseModel):
     item_var: str = Field(default="item")
     index_var: str | None = Field(default=None)
     max_iterations: int = Field(default=1000, ge=1)
-    body: str | list[str] | None = Field(default=None)
     break_condition: str | None = Field(default=None)
     continue_condition: str | None = Field(default=None)
     iterator_var: str | None = Field(default=None)
@@ -232,7 +231,8 @@ class NodeDefinition(BaseModel):
     url: str | None = Field(default=None)
     method: str | None = Field(default=None)
     headers: dict[str, Any] | None = Field(default=None)
-    body: Any = Field(default=None)
+    # loop: body node id(s); http_request: request payload
+    body: str | list[str] | dict[str, Any] | Any | None = Field(default=None)
     fail_on_error: bool = Field(default=True)
 
     # Transform node fields

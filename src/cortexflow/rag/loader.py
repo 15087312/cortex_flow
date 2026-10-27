@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from cortexflow.rag.document import Document
+
+logger = logging.getLogger(__name__)
 
 
 class TextLoader:
@@ -23,7 +26,9 @@ class TextLoader:
 class FileLoader:
     """Load documents from files."""
 
-    SUPPORTED_EXTENSIONS = {".txt", ".md", ".json", ".csv", ".yaml", ".yml"}
+    SUPPORTED_EXTENSIONS: ClassVar[frozenset[str]] = frozenset(
+        {".txt", ".md", ".json", ".csv", ".yaml", ".yml"}
+    )
 
     def load(
         self,
@@ -70,14 +75,13 @@ class FileLoader:
                     docs = self.load(file_path, metadata, encoding)
                     documents.extend(docs)
                 except Exception:
-                    continue
+                    logger.warning("Skipping unreadable file %s", file_path, exc_info=True)
 
         return documents
 
 
 class DirectoryLoader(FileLoader):
     """Alias for FileLoader with directory focus."""
-    pass
 
 
 class JSONLoader:

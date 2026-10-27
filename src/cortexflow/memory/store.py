@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import math
 import hashlib
-import time
+import math
 from typing import Any
 
-from cortexflow.memory.types import MemoryEntry, MemoryType, MemoryImportance
+from cortexflow.memory.types import MemoryEntry, MemoryType
 
 
 class BaseMemoryStore:

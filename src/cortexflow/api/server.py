@@ -32,7 +32,7 @@ async def _run_scheduled(workflow: dict, variables: dict) -> None:
             "status": "suspended", "scheduled": True,
             "question": getattr(w, "question", None),
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         routes_module._executions[wf.id] = {
             "status": "failed", "error": str(exc), "scheduled": True,
         }

@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import defaultdict
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from cortexflow.events.types import Event
+
+logger = logging.getLogger(__name__)
 
 
 class EventBus:
@@ -26,7 +30,7 @@ class EventBus:
                 else:
                     handler(event)
             except Exception:
-                pass
+                logger.exception("Event handler failed for %s", event.type)
 
         # Wake up waiters
         for future in self._waiters.get(event.type, []):
@@ -51,12 +55,9 @@ class EventBus:
         future = loop.create_future()
         self._waiters[event_type].append(future)
 
-        try:
-            event = await asyncio.wait_for(future, timeout)
-            if filter:
-                for key, value in filter.items():
-                    if event.payload.get(key) != value:
-                        return await self.wait_for(event_type, filter, timeout)
-            return event
-        except asyncio.TimeoutError:
-            raise
+        event = await asyncio.wait_for(future, timeout)
+        if filter:
+            for key, value in filter.items():
+                if event.payload.get(key) != value:
+                    return await self.wait_for(event_type, filter, timeout)
+        return event

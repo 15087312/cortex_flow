@@ -157,17 +157,22 @@ async def _validate_handler(
         if expected in type_map and not isinstance(data, type_map[expected]):
             errors.append(f"Expected type '{expected}', got '{type(data).__name__}'")
 
-    if "min_length" in rules and isinstance(data, (str, list)):
-        if len(data) < rules["min_length"]:
-            errors.append(f"Length {len(data)} is less than minimum {rules['min_length']}")
+    if (
+        "min_length" in rules
+        and isinstance(data, (str, list))
+        and len(data) < rules["min_length"]
+    ):
+        errors.append(f"Length {len(data)} is less than minimum {rules['min_length']}")
 
-    if "max_length" in rules and isinstance(data, (str, list)):
-        if len(data) > rules["max_length"]:
-            errors.append(f"Length {len(data)} exceeds maximum {rules['max_length']}")
+    if (
+        "max_length" in rules
+        and isinstance(data, (str, list))
+        and len(data) > rules["max_length"]
+    ):
+        errors.append(f"Length {len(data)} exceeds maximum {rules['max_length']}")
 
-    if "pattern" in rules and isinstance(data, str):
-        if not re.match(rules["pattern"], data):
-            errors.append(f"Does not match pattern '{rules['pattern']}'")
+    if "pattern" in rules and isinstance(data, str) and not re.match(rules["pattern"], data):
+        errors.append(f"Does not match pattern '{rules['pattern']}'")
 
     if "enum" in rules and data not in rules["enum"]:
         errors.append(f"Value '{data}' not in allowed values: {rules['enum']}")

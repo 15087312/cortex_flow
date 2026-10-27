@@ -9,13 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import secrets
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from cortexflow.store.common import default_db_path
 
@@ -86,7 +84,7 @@ class AuthStore:
                 "INSERT INTO users (username, password_hash, created_at) "
                 "VALUES (?, ?, ?)",
                 (username, hash_password(password),
-                 datetime.now(timezone.utc).isoformat()),
+                 datetime.now(UTC).isoformat()),
             )
             return True
 

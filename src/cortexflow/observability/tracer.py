@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -39,7 +39,7 @@ class Tracer:
         trace = NodeTrace(
             node_id=node_id,
             node_type=node_type,
-            started_at=datetime.now(),
+            started_at=datetime.now(UTC),
             **kwargs,
         )
         if flow_id not in self._traces:
@@ -60,7 +60,7 @@ class Tracer:
         if flow_id in self._traces:
             for trace in reversed(self._traces[flow_id]):
                 if trace.node_id == node_id and trace.completed_at is None:
-                    trace.completed_at = datetime.now()
+                    trace.completed_at = datetime.now(UTC)
                     if output_summary is not None:
                         trace.output_summary = output_summary
                     if input_summary is not None:

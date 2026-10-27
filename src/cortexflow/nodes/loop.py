@@ -58,7 +58,6 @@ class LoopNode(BaseNode):
         iterator_var = self.config.get("iterator_var", "iteration")
         break_condition = self.config.get("break_condition")
         continue_condition = self.config.get("continue_condition")
-        body = self.config.get("body")
         results = []
 
         for i in range(count):
@@ -83,7 +82,6 @@ class LoopNode(BaseNode):
         iterator_var = self.config.get("iterator_var", "iteration")
         break_condition = self.config.get("break_condition")
         continue_condition = self.config.get("continue_condition")
-        body = self.config.get("body")
         results = []
         i = 0
 
@@ -114,7 +112,6 @@ class LoopNode(BaseNode):
         iterator_var = self.config.get("iterator_var", "iteration")
         break_condition = self.config.get("break_condition")
         continue_condition = self.config.get("continue_condition")
-        body = self.config.get("body")
         results = []
         i = 0
 
@@ -148,13 +145,12 @@ class LoopNode(BaseNode):
 
         items = resolve_value(items_ref, context.get_variable)
         if not isinstance(items, (list, tuple)):
-            raise ValueError(f"Foreach items must be iterable, got {type(items)}")
+            raise TypeError(f"Foreach items must be iterable, got {type(items)}")
 
         item_var = self.config.get("item_var", "item")
         index_var = self.config.get("index_var")
         break_condition = self.config.get("break_condition")
         continue_condition = self.config.get("continue_condition")
-        body = self.config.get("body")
         results = []
 
         for i, item in enumerate(items[:max_iterations]):

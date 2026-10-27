@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -66,7 +66,7 @@ class TemplateStore:
                     json.dumps(tags or [], ensure_ascii=False),
                     json.dumps(definition, ensure_ascii=False),
                     author, version,
-                    datetime.now(timezone.utc).isoformat(),
+                    datetime.now(UTC).isoformat(),
                 ),
             )
             tid = cur.lastrowid

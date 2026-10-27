@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def _parse_time(value: str | None) -> datetime | None:
     try:
         parsed = datetime.fromisoformat(value)
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+            parsed = parsed.replace(tzinfo=UTC)
         return parsed
     except ValueError:
         return None
@@ -76,7 +77,7 @@ class Scheduler:
 
     def due_workflows(self) -> list[dict[str, Any]]:
         """Workflows whose schedule is due (and not already running)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         due = []
         for wf in self._store.list():
             sched = self.schedule_of(wf.get("definition") or {})
@@ -109,7 +110,7 @@ class Scheduler:
         try:
             await self._run_workflow(workflow, schedule.get("variables") or {})
             self._state.record_run(workflow_id, "completed")
-        except Exception as exc:  # a failing schedule must not kill the loop
+        except Exception as exc:  # a failing schedule must not kill the loop  # noqa: BLE001
             logger.warning("Scheduled run of %s failed: %s", workflow_id, exc)
             self._state.record_run(workflow_id, f"failed: {exc}")
         finally:
@@ -121,7 +122,7 @@ class Scheduler:
         while not self._stopped:
             try:
                 await self.tick()
-            except Exception as exc:  # never let the loop die
+            except Exception as exc:  # never let the loop die  # noqa: BLE001
                 logger.warning("Scheduler tick failed: %s", exc)
             await asyncio.sleep(self._poll_seconds)
 

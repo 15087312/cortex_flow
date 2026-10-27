@@ -64,7 +64,7 @@ class HttpRequestNode(BaseNode):
         if "application/json" in content_type:
             try:
                 return response.json()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return response.text
         else:
             return response.text

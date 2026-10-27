@@ -16,14 +16,14 @@ from cortexflow.dsl.parser import Parser
 from cortexflow.dsl.schema import WorkflowDefinition
 from cortexflow.events.bus import EventBus
 from cortexflow.events.types import Event
+from cortexflow.memory.manager import MemoryManager
 from cortexflow.observability.metrics import MetricsCollector
 from cortexflow.observability.tracer import Tracer
+from cortexflow.rag.pipeline import RAGPipeline
 from cortexflow.runtime.context import ExecutionContext
 from cortexflow.runtime.executor import Executor
-from cortexflow.memory.manager import MemoryManager
-from cortexflow.rag.pipeline import RAGPipeline
-from cortexflow.skills.registry import SkillRegistry
 from cortexflow.skills.builtins import register_builtin_skills
+from cortexflow.skills.registry import SkillRegistry
 from cortexflow.state.checkpoint import CheckpointStore
 
 
@@ -143,7 +143,7 @@ class Engine:
 
         metadata = {
             k: v for k, v in (checkpoint.metadata or {}).items()
-            if k.startswith("_wait_config_") or k.startswith("_ask_")
+            if k.startswith(("_wait_config_", "_ask_"))
         }
         if ir is not None:
             metadata["_flow"] = ir

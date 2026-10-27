@@ -3,4 +3,4 @@
 from cortexflow.observability.metrics import MetricsCollector
 from cortexflow.observability.tracer import NodeTrace, Tracer
 
-__all__ = ["Tracer", "NodeTrace", "MetricsCollector"]
+__all__ = ["MetricsCollector", "NodeTrace", "Tracer"]

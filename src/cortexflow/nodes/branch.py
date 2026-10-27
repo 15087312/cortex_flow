@@ -30,9 +30,8 @@ class BranchNode(BaseNode):
     ) -> str | None:
         for cond in conditions:
             when = cond.get("when")
-            if when:
-                if evaluate_condition(when, context.get_variable):
-                    return cond.get("goto")
+            if when and evaluate_condition(when, context.get_variable):
+                return cond.get("goto")
             otherwise = cond.get("otherwise")
             if otherwise:
                 return otherwise
@@ -60,5 +59,5 @@ class BranchNode(BaseNode):
                 if key in str(decision_text):
                     return output_mapping[key]
 
-        decision = list(output_mapping.keys())[0] if output_mapping else None
+        decision = next(iter(output_mapping), None)
         return output_mapping.get(decision)

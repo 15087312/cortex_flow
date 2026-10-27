@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import RLock
 from typing import Any
 
@@ -175,7 +175,7 @@ class Blackboard:
             }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any] | None) -> "Blackboard":
+    def from_dict(cls, data: dict[str, Any] | None) -> Blackboard:
         """Rebuild a blackboard from :meth:`to_dict` output (best-effort)."""
         bb = cls()
         if not isinstance(data, dict):

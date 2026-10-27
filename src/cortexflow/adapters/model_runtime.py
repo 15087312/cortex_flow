@@ -65,7 +65,6 @@ class RealModelRuntimeAdapter(ModelRuntimeAdapter):
         **kwargs: Any,
     ) -> dict[str, Any]:
         model, provider = self._get_model_and_provider(tier, identity)
-        output_format = kwargs.get("output_format", "text")
 
         if provider == "anthropic":
             return await self._call_anthropic(model, messages, **kwargs)

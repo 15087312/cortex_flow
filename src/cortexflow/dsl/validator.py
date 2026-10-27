@@ -8,7 +8,6 @@ from cortexflow.dsl.schema import NodeType, WorkflowDefinition
 class ValidationError(Exception):
     """Validation error."""
 
-    pass
 
 
 class Validator:
@@ -113,18 +112,21 @@ class Validator:
             if node.type == NodeType.TOOL and not node.tool:
                 raise ValidationError(f"Tool node '{node_id}' missing 'tool' field")
 
-            if node.type == NodeType.BRANCH:
-                if not node.conditions:
-                    raise ValidationError(f"Branch node '{node_id}' missing 'conditions'")
+            if node.type == NodeType.BRANCH and not node.conditions:
+                raise ValidationError(f"Branch node '{node_id}' missing 'conditions'")
 
             if node.type == NodeType.LOOP:
                 if not node.body:
                     raise ValidationError(f"Loop node '{node_id}' missing 'body'")
-                if node.loop_mode and node.loop_mode.value == "foreach":
-                    if not node.items and not node.foreach:
-                        raise ValidationError(
-                            f"Foreach loop '{node_id}' needs 'items' or 'foreach'"
-                        )
+                if (
+                    node.loop_mode
+                    and node.loop_mode.value == "foreach"
+                    and not node.items
+                    and not node.foreach
+                ):
+                    raise ValidationError(
+                        f"Foreach loop '{node_id}' needs 'items' or 'foreach'"
+                    )
 
             if node.type == NodeType.PARALLEL:
                 if not node.branches:
@@ -135,21 +137,17 @@ class Validator:
                             f"Parallel node '{node_id}' references unknown branch '{branch_id}'"
                         )
 
-            if node.type == NodeType.MAP:
-                if not node.collection:
-                    raise ValidationError(f"Map node '{node_id}' missing 'collection'")
-                if not node.map_body:
-                    raise ValidationError(f"Map node '{node_id}' missing 'map_body'")
-                if node.map_body not in all_ids:
-                    raise ValidationError(
-                        f"Map node '{node_id}' references unknown body '{node.map_body}'"
-                    )
+            if node.type == NodeType.MAP and (not node.collection or not node.map_body):
+                missing = "collection" if not node.collection else "map_body"
+                raise ValidationError(f"Map node '{node_id}' missing '{missing}'")
 
-            if node.type == NodeType.AGGREGATE:
-                if not node.groups:
-                    raise ValidationError(
-                        f"Aggregate node '{node_id}' missing 'groups'"
-                    )
+            if node.type == NodeType.MAP and node.map_body not in all_ids:
+                raise ValidationError(
+                    f"Map node '{node_id}' references unknown body '{node.map_body}'"
+                )
+
+            if node.type == NodeType.AGGREGATE and not node.groups:
+                raise ValidationError(f"Aggregate node '{node_id}' missing 'groups'")
 
             if node.type == NodeType.INTENT:
                 if not node.intents:
@@ -166,9 +164,8 @@ class Validator:
                         f"'{node.otherwise}'"
                     )
 
-            if node.type == NodeType.ASK:
-                if not node.question:
-                    raise ValidationError(f"Ask node '{node_id}' missing 'question'")
+            if node.type == NodeType.ASK and not node.question:
+                raise ValidationError(f"Ask node '{node_id}' missing 'question'")
 
     def _validate_variables(self, workflow: WorkflowDefinition) -> None:
         """Validate variable definitions."""

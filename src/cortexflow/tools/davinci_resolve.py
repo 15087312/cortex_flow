@@ -72,7 +72,7 @@ def resolve_connect(**kwargs) -> dict:
 resolve_connect._tool_description = "Connect to DaVinci Resolve and return version info"
 
 
-def resolve_import_media(file_paths: list[str] | str = None, **kwargs) -> dict:
+def resolve_import_media(file_paths: list[str] | str | None = None, **kwargs) -> dict:
     """Import media files into the DaVinci Resolve media pool."""
     if file_paths is None:
         file_paths = kwargs.get("paths", [])
@@ -133,9 +133,9 @@ resolve_create_timeline._tool_parameters = {
 
 
 def resolve_add_clip_to_timeline(
-    media_path: str = None,
+    media_path: str | None = None,
     track_index: int = 1,
-    position: float = None,
+    position: float | None = None,
     **kwargs,
 ) -> dict:
     """Add a media clip to the current timeline."""
@@ -182,7 +182,7 @@ resolve_add_clip_to_timeline._tool_parameters = {
 
 
 def resolve_trim_clip(
-    clip_index: int = None,
+    clip_index: int | None = None,
     trim_start: float = 0,
     trim_end: float = 0,
     **kwargs,
@@ -230,7 +230,7 @@ resolve_trim_clip._tool_parameters = {
 
 
 def resolve_add_transition(
-    clip_index: int = None,
+    clip_index: int | None = None,
     transition_type: str = "Smooth Cut",
     duration_frames: int = 30,
     **kwargs,
@@ -274,7 +274,7 @@ resolve_add_transition._tool_parameters = {
 }
 
 
-def resolve_delete_clip(clip_index: int = None, **kwargs) -> dict:
+def resolve_delete_clip(clip_index: int | None = None, **kwargs) -> dict:
     """Delete a clip from the timeline (cut operation)."""
     if clip_index is None:
         clip_index = kwargs.get("index", 1)
@@ -302,7 +302,7 @@ resolve_delete_clip._tool_parameters = {
 
 
 def resolve_add_subtitles(
-    srt_content: str = None,
+    srt_content: str | None = None,
     track_index: int = 1,
     **kwargs,
 ) -> dict:
@@ -345,7 +345,7 @@ resolve_add_subtitles._tool_parameters = {
 
 
 def resolve_render(
-    output_path: str = None,
+    output_path: str | None = None,
     preset: str = "H.264 Master",
     **kwargs,
 ) -> dict:
@@ -419,7 +419,7 @@ resolve_get_timeline_info._tool_description = "Get current timeline info (durati
 
 
 def resolve_set_color_grade(
-    clip_index: int = None,
+    clip_index: int | None = None,
     preset: str = "cinematic",
     **kwargs,
 ) -> dict:

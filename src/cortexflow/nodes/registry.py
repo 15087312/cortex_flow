@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from cortexflow.nodes.base import BaseNode
 
@@ -10,7 +10,7 @@ from cortexflow.nodes.base import BaseNode
 class NodeRegistry:
     """Registry for node types."""
 
-    _registry: dict[str, type[BaseNode]] = {}
+    _registry: ClassVar[dict[str, type[BaseNode]]] = {}
 
     @classmethod
     def register(cls, node_type: str):

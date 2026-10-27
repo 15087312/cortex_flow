@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from cortexflow.agents.definition import AgentDefinition
 from cortexflow.agents.agent import Agent
+from cortexflow.agents.definition import AgentDefinition
 
 
 class AgentRegistry:

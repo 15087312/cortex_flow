@@ -28,7 +28,7 @@ class MapNode(BaseNode):
 
         collection = resolve_value(collection_ref, context.get_variable)
         if not isinstance(collection, (list, tuple)):
-            raise ValueError(f"Map collection must be iterable, got {type(collection)}")
+            raise TypeError(f"Map collection must be iterable, got {type(collection)}")
 
         if context.executor and map_body:
             if concurrency and concurrency > 1:

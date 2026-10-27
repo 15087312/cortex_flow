@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from cortexflow.rag.document import Document, Chunk
-from cortexflow.rag.loader import TextLoader, FileLoader
-from cortexflow.rag.splitter import TextSplitter, RecursiveTextSplitter
+from cortexflow.rag.document import Chunk, Document
+from cortexflow.rag.loader import FileLoader, TextLoader
+from cortexflow.rag.splitter import RecursiveTextSplitter, TextSplitter
 
 
 class DocumentStore:
@@ -54,7 +54,6 @@ class DocumentStore:
         min_score: float = 0.0,
         filter_doc_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        import math
 
         query_vec = self._embed(query)
 

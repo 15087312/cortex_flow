@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from cortexflow.compiler.ir import FlowIR, NodeIR
@@ -62,7 +62,7 @@ class Executor:
                     result = await self._execute_with_lifecycle(node_ir, context)
                 except WaitEvent:
                     raise
-                except Exception as exc:
+                except Exception:
                     context.node_states[current_node] = NodeState.FAILED
                     if node_ir.on_error and node_ir.on_error in flow.nodes:
                         current_node = node_ir.on_error
@@ -157,7 +157,6 @@ class Executor:
         if not node_id:
             raise ValueError("No current node to resume")
 
-        node_ir = None
         for nid, ns in context.node_states.items():
             if ns == NodeState.WAITING:
                 node_id = nid
@@ -177,7 +176,6 @@ class Executor:
         try:
             wait_config = context.metadata.get(f"_wait_config_{node_id}", {})
             on_event = wait_config.get("on_event")
-            on_timeout = wait_config.get("on_timeout")
 
             if on_event:
                 context.current_node = on_event
@@ -278,7 +276,7 @@ class Executor:
                     )
                 raise
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 if self.metrics:
                     self.metrics.record_error(node_ir.type)
@@ -388,7 +386,7 @@ class Executor:
             blackboard_snapshot=context.blackboard.to_dict(),
             current_node=context.current_node,
             pending_events=[wait_event.event_type],
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
             metadata=dict(context.metadata),
         )
         await self.checkpoint_store.save(checkpoint)

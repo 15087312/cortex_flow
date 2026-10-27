@@ -5,4 +5,4 @@ from cortexflow.runtime.dispatcher import NodeDispatcher
 from cortexflow.runtime.events import WaitEvent
 from cortexflow.runtime.executor import Executor
 
-__all__ = ["Executor", "ExecutionContext", "NodeDispatcher", "WaitEvent"]
+__all__ = ["ExecutionContext", "Executor", "NodeDispatcher", "WaitEvent"]

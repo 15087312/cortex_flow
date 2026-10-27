@@ -19,11 +19,9 @@ class BaseNode(ABC):
     @abstractmethod
     async def execute(self, context: ExecutionContext) -> Any:
         """Execute node logic."""
-        pass
 
     def validate_config(self) -> None:
         """Validate node configuration."""
-        pass
 
     def get_dependencies(self) -> list[str]:
         """Get variable dependencies."""

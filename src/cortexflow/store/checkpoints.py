@@ -16,7 +16,7 @@ import os
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from cortexflow.state.checkpoint import Checkpoint
@@ -69,7 +69,7 @@ class CheckpointStore:
         metadata = checkpoint.metadata or {}
         wait_configs = {
             k: v for k, v in metadata.items()
-            if k.startswith("_wait_config_") or k.startswith("_ask_")
+            if k.startswith(("_wait_config_", "_ask_"))
         }
         node_states = {}
         for node_id, state in (checkpoint.node_states or {}).items():

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,8 @@ from cortexflow.store.executions import ExecutionStore
 from cortexflow.store.templates import TemplateStore
 from cortexflow.store.testcases import TestCaseStore
 from cortexflow.store.workflows import WorkflowStore
+
+logger = logging.getLogger(__name__)
 
 # ── Auth (must be defined before `router` so Depends can reference it) ──
 
@@ -135,7 +137,7 @@ async def _execute_workflow(engine: Engine, workflow_id: str,
     """Run a workflow, persist execution history, return the API payload."""
     from cortexflow.dsl.schema import WorkflowDefinition
 
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     try:
         workflow = WorkflowDefinition(**wf_data["definition"])
         result = await engine.run(workflow, variables)
@@ -161,7 +163,7 @@ async def _execute_workflow(engine: Engine, workflow_id: str,
                               traces=traces, started_at=started)
         return {"status": "suspended", "workflow_id": workflow_id,
                 "event": w.event_type}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         traces = await _serialize_traces(engine, workflow_id)
         _executions[workflow_id] = {"status": "failed", "error": str(exc)}
         _execution_log.record(workflow_id, "failed", variables=variables,
@@ -170,7 +172,7 @@ async def _execute_workflow(engine: Engine, workflow_id: str,
 
 
 async def _on_event(event: Event) -> None:
-    for eq in list(_event_queues):
+    for eq in _event_queues:
         try:
             eq.put_nowait(event)
         except asyncio.QueueFull:
@@ -240,7 +242,7 @@ async def validate_workflow(definition: dict):
         wf = WorkflowDefinition(**definition)
         Validator().validate(wf)
         return {"valid": True, "errors": []}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"valid": False, "errors": [{"message": str(exc)}]}
 
 
@@ -370,7 +372,7 @@ async def resume_workflow(workflow_id: str, event_data: dict[str, Any] | None = 
                               traces=await _serialize_traces(engine, workflow_id),
                               error="resumed")
         return {"status": "resumed", "workflow_id": workflow_id, "result": result}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _executions[workflow_id] = {"status": "failed", "error": str(exc)}
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -654,6 +656,7 @@ def _scan_examples() -> list[dict[str, Any]]:
         try:
             data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
         except Exception:
+            logger.debug("Skipping unparsable template %s", f, exc_info=True)
             continue
         if not isinstance(data, dict) or "nodes" not in data:
             continue
@@ -791,7 +794,7 @@ async def chat_with_agent(agent_id: str, request: AgentMessageRequest):
                 temperature=defn.temperature,
             )
             response = result.get("output", "") if isinstance(result, dict) else str(result)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             response = f"[LLM 调用失败: {e}]"
     else:
         response = f"[{agent.name}] Acknowledged: {request.message}"
@@ -892,7 +895,7 @@ async def invoke_skill(skill_id: str, request: SkillInvokeRequest):
         result = await skill_registry.invoke(skill_id, **request.params)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_id}' not found")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(e))
     return {"skill_id": skill_id, "result": result}
 
@@ -935,7 +938,7 @@ async def memory_manager_store(request: MemoryManagerStoreRequest):
     mm = engine._adapters.get("memory_manager")
     if not mm:
         raise HTTPException(status_code=500, detail="Memory manager not available")
-    from cortexflow.memory.types import MemoryType, MemoryImportance
+    from cortexflow.memory.types import MemoryImportance, MemoryType
     try:
         mem_type = MemoryType(request.memory_type)
         importance = MemoryImportance(request.importance)
