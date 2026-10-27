@@ -14,6 +14,21 @@
 - **挂起恢复**：基于延续的事件驱动
 - **感知集成**：视觉/音频/传感器作为一等输入
 
+## 内置节点
+
+| 分类 | 节点 | 说明 |
+|------|------|------|
+| AI | `model` / `agent` / `collaborate` / `skill` | 模型推理、Agent 调用、多 Agent 协作、预制技能 |
+| 流程控制 | `branch` / `loop` / `parallel` / `map` / `subflow` | 条件分支、循环、并发、集合映射、子流程 |
+| 流程控制 | `wait` / `ask` / `end` / `break` / `continue` / `aggregate` | 事件挂起、人工追问、结束、循环控制、分支收敛 |
+| 数据 | `state` / `transform` / `text` / `code` / `database` | 变量读写、结构映射、字符串处理、Python 片段、SQLite 增删改查 |
+| 集成 | `http_request` / `retrieval` / `memory` / `perception` | HTTP 调用、知识库检索、长期记忆、感知输入 |
+| 路由 | `intent` | 关键词意图分流 |
+
+新增的 Coze 风格节点示例见 [examples/data_processing_flow.yaml](./examples/data_processing_flow.yaml)。
+
+> `code` 节点只暴露白名单内置函数（无 `open`/`eval`/`import`），但它运行在宿主解释器里，属于防误用而非安全沙箱，请只运行可信工作流。
+
 ## 环境要求
 
 - Python 3.11+

@@ -9,7 +9,6 @@ from cortexflow.store.auth import AuthStore
 from cortexflow.store.executions import ExecutionStore
 from cortexflow.store.templates import TemplateStore
 
-
 # ── JWT unit ───────────────────────────────────────────────
 
 def test_jwt_roundtrip_and_expiry():

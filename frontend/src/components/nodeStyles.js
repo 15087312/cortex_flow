@@ -22,6 +22,9 @@ export const NODE_COLORS = {
   aggregate: { bg: '#1a2a3a', border: '#38bdf8', text: '#7dd3fc' },
   intent: { bg: '#2a1a3a', border: '#c084fc', text: '#d8b4fe' },
   ask: { bg: '#3a2a1a', border: '#f59e0b', text: '#fcd34d' },
+  code: { bg: '#1a2a3a', border: '#0ea5e9', text: '#7dd3fc' },
+  database: { bg: '#1a2a2a', border: '#14b8a6', text: '#5eead4' },
+  text: { bg: '#2a2a3a', border: '#818cf8', text: '#c7d2fe' },
 }
 
 export const NODE_ICONS = {
@@ -48,6 +51,9 @@ export const NODE_ICONS = {
   aggregate: 'git-merge',
   intent: 'message-circle',
   ask: 'help-circle',
+  code: 'code',
+  database: 'database',
+  text: 'text',
 }
 
 export function getNodeStyle(type) {

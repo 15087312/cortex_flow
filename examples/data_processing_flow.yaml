@@ -1,0 +1,58 @@
+id: data_processing
+name: 数据处理示例（代码 + 文本 + 数据库）
+version: 1.0.0
+description: 演示 Coze 风格的 code / text / database 节点
+config:
+  default_tier: default
+  role: assistant
+variables:
+  numbers:
+    type: list
+    required: true
+    description: 需要统计的数字列表
+entry: compute
+nodes:
+  compute:
+    type: code
+    inputs:
+      numbers: ${numbers}
+    code: |
+      total = sum(numbers)
+      output = {
+          "total": total,
+          "count": len(numbers),
+          "average": round(total / len(numbers), 2) if numbers else 0,
+      }
+    output: stats
+    on_success: format_summary
+  format_summary:
+    type: text
+    text_action: template
+    input: ${stats}
+    text_args:
+      template: "共 {{count}} 项，合计 {{total}}，平均 {{average}}"
+    output: summary
+    on_success: ensure_table
+  ensure_table:
+    type: database
+    database: data/example_flow.db
+    db_action: execute
+    sql: |
+      CREATE TABLE IF NOT EXISTS flow_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        summary TEXT NOT NULL
+      )
+    on_success: save_summary
+  save_summary:
+    type: database
+    database: data/example_flow.db
+    db_action: insert
+    table: flow_runs
+    values:
+      summary: ${summary}
+    output: saved
+    on_success: done
+  done:
+    type: end
+    end_mode: variable
+    return_value: ${summary}

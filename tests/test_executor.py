@@ -4,9 +4,9 @@ import asyncio
 
 import pytest
 
-from cortexflow.compiler.ir import BlackboardConfigIR, FlowIR, NodeIR, VariableIR
+from cortexflow.compiler.ir import BlackboardConfigIR, FlowIR, NodeIR
 from cortexflow.events.bus import EventBus
-from cortexflow.events.types import Event, EventType
+from cortexflow.events.types import EventType
 from cortexflow.observability.metrics import MetricsCollector
 from cortexflow.observability.tracer import Tracer
 from cortexflow.runtime.context import ExecutionContext, FlowState, NodeState
@@ -51,7 +51,7 @@ async def test_execute_simple_flow():
     ctx = ExecutionContext()
     ctx.metadata["_flow"] = flow
     executor = Executor()
-    result = await executor.execute(flow, ctx)
+    await executor.execute(flow, ctx)
     assert ctx.state == FlowState.COMPLETED
     assert ctx.variables.get("result") == "start"
 
@@ -185,7 +185,7 @@ async def test_retry_on_failure():
     ctx = ExecutionContext()
     ctx.metadata["_flow"] = flow
     executor = Executor()
-    result = await executor.execute(flow, ctx)
+    await executor.execute(flow, ctx)
     assert call_count == 3
     assert ctx.state == FlowState.COMPLETED
 

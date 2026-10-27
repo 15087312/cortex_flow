@@ -167,6 +167,37 @@ class Validator:
             if node.type == NodeType.ASK and not node.question:
                 raise ValidationError(f"Ask node '{node_id}' missing 'question'")
 
+            if node.type == NodeType.CODE and not node.code:
+                raise ValidationError(f"Code node '{node_id}' missing 'code'")
+            if node.type == NodeType.CODE and node.language != "python":
+                raise ValidationError(
+                    f"Code node '{node_id}' only supports 'python', "
+                    f"got '{node.language}'"
+                )
+
+            if node.type == NodeType.DATABASE:
+                action = node.db_action
+                if action not in {"query", "insert", "update", "delete", "execute"}:
+                    raise ValidationError(
+                        f"Database node '{node_id}' has unknown db_action '{action}'"
+                    )
+                if not node.sql and not node.table:
+                    raise ValidationError(
+                        f"Database node '{node_id}' needs 'sql' or 'table'"
+                    )
+                if action in {"insert", "update"} and not node.values:
+                    raise ValidationError(
+                        f"Database node '{node_id}' {action} needs 'values'"
+                    )
+                if action in {"update", "delete"} and not node.where and not node.allow_all:
+                    raise ValidationError(
+                        f"Database node '{node_id}' {action} needs 'where' "
+                        f"(or allow_all: true)"
+                    )
+
+            if node.type == NodeType.TEXT and not node.text_action:
+                raise ValidationError(f"Text node '{node_id}' missing 'text_action'")
+
     def _validate_variables(self, workflow: WorkflowDefinition) -> None:
         """Validate variable definitions."""
         for var_name, var_def in workflow.variables.items():

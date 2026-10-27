@@ -3,7 +3,6 @@
 import pytest
 
 from cortexflow.engine import Engine
-from cortexflow.runtime.context import FlowState
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,5 @@
 """Tests for compiler."""
 
-import pytest
 
 from cortexflow.compiler.compiler import Compiler
 from cortexflow.dsl.schema import WorkflowDefinition

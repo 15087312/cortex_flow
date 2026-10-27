@@ -32,6 +32,9 @@ const nodeTypes = [
   { type: 'aggregate', name: '合并节点', icon: 'git-merge', desc: '多分支输出收敛', snippet: '  merge:\n    type: aggregate\n    groups:\n      - output: answer\n        from: [branch_a_out, branch_b_out]\n        strategy: first' },
   { type: 'intent', name: '意图路由', icon: 'message-circle', desc: '关键词意图分流', snippet: '  route:\n    type: intent\n    input: "${user_text}"\n    intents:\n      - name: refund\n        keywords: [退款, refund]\n        goto: refund_flow\n    otherwise: fallback' },
   { type: 'ask', name: '追问节点', icon: 'help-circle', desc: '挂起提问等人答', snippet: '  confirm:\n    type: ask\n    question: "确认执行吗？(yes/no)"\n    output: confirmed\n    on_event: next_step' },
+  { type: 'code', name: '代码节点', icon: 'code', desc: '运行 Python 片段', snippet: '  compute:\n    type: code\n    inputs:\n      numbers: "${numbers}"\n    code: |\n      total = sum(numbers)\n      output = {"total": total}\n    output: stats' },
+  { type: 'database', name: '数据库节点', icon: 'database', desc: 'SQLite 增删改查', snippet: '  save_row:\n    type: database\n    db_action: insert\n    table: orders\n    values:\n      order_id: "${order_id}"\n      amount: "${total}"\n    output: saved' },
+  { type: 'text', name: '文本处理', icon: 'text', desc: '字符串/正则/JSON', snippet: '  clean:\n    type: text\n    text_action: replace\n    input: "${raw_text}"\n    text_args:\n      old: "\\n\\n"\n      new: "\\n"\n    output: cleaned' },
 ]
 
 function copySnippet(node) {

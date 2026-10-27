@@ -6,10 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from cortexflow.nodes.http_request import HttpRequestNode
-from cortexflow.nodes.transform import TransformNode
 from cortexflow.nodes.registry import NodeRegistry
+from cortexflow.nodes.transform import TransformNode
 from cortexflow.runtime.context import ExecutionContext
-
 
 # --- Registry tests ---
 

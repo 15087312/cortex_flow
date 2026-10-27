@@ -185,9 +185,7 @@ async def test_intent_routes_flow():
 def test_validator_accepts_new_nodes():
     from cortexflow.dsl.schema import WorkflowDefinition
     from cortexflow.dsl.validator import Validator
-    wf = WorkflowDefinition(**{
-        "id": "v", "name": "V", "entry": "route",
-        "nodes": {
+    wf = WorkflowDefinition(id="v", name="V", entry="route", nodes={
             "route": {"type": "intent", "input": "${t}",
                        "intents": [{"name": "a", "keywords": ["x"],
                                     "goto": "a_flow"}],
@@ -198,21 +196,17 @@ def test_validator_accepts_new_nodes():
                        "groups": [{"output": "o", "from": ["x"]}],
                        "on_success": "done"},
             "done": {"type": "end", "return_value": "o"},
-        },
-    })
+        })
     Validator().validate(wf)  # must not raise
 
 
 def test_validator_rejects_bad_intent_ref():
     from cortexflow.dsl.schema import WorkflowDefinition
-    from cortexflow.dsl.validator import Validator, ValidationError
-    wf = WorkflowDefinition(**{
-        "id": "v", "name": "V", "entry": "route",
-        "nodes": {
+    from cortexflow.dsl.validator import ValidationError, Validator
+    wf = WorkflowDefinition(id="v", name="V", entry="route", nodes={
             "route": {"type": "intent",
                        "intents": [{"name": "a", "keywords": ["x"],
                                     "goto": "ghost"}]},
-        },
-    })
+        })
     with pytest.raises(ValidationError, match="ghost"):
         Validator().validate(wf)

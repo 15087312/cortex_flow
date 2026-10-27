@@ -34,6 +34,9 @@ class NodeType(str, Enum):
     AGGREGATE = "aggregate"
     INTENT = "intent"
     ASK = "ask"
+    CODE = "code"
+    DATABASE = "database"
+    TEXT = "text"
 
 
 class OutputFormat(str, Enum):
@@ -237,6 +240,27 @@ class NodeDefinition(BaseModel):
 
     # Transform node fields
     mapping: dict[str, Any] | None = Field(default=None)
+
+    # Code node fields (Coze-style code node): declared inputs + python snippet
+    code: str | None = Field(default=None)
+    inputs: dict[str, Any] | None = Field(default=None)
+    language: str = Field(default="python")
+    code_timeout: int = Field(default=10, ge=1)
+
+    # Database node fields (SQLite CRUD)
+    db_action: str = Field(default="query")  # query | insert | update | delete | execute
+    database: str | None = Field(default=None)
+    sql: str | None = Field(default=None)
+    db_params: list[Any] | None = Field(default=None)
+    table: str | None = Field(default=None)
+    values: dict[str, Any] | None = Field(default=None)
+    where: dict[str, Any] | None = Field(default=None)
+    limit: int | None = Field(default=None, ge=1)
+    allow_all: bool = Field(default=False)
+
+    # Text node fields (string processing)
+    text_action: str | None = Field(default=None)
+    text_args: dict[str, Any] = Field(default_factory=dict)
 
     # Memory node fields
     memory_action: str | None = Field(default=None)  # "store" or "query"

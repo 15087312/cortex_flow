@@ -1,6 +1,5 @@
 """Tests for variable resolver."""
 
-import pytest
 
 from cortexflow.utils.resolver import evaluate_condition, resolve_value
 

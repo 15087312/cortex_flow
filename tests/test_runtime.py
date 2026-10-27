@@ -1,6 +1,5 @@
 """Tests for runtime layer - context, executor, events."""
 
-import pytest
 
 from cortexflow.runtime.context import ExecutionContext, FlowState, NodeState
 

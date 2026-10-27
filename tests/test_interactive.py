@@ -12,9 +12,7 @@ from cortexflow.runtime.events import AskQuestion
 from cortexflow.scheduler import Scheduler
 from cortexflow.state.blackboard import Blackboard
 from cortexflow.state.checkpoint import Checkpoint, CheckpointStore
-from cortexflow.store.schedules import ScheduleState
 from cortexflow.store.testcases import TestCaseStore
-
 
 ASK_YAML = """
 id: aske2e
@@ -98,11 +96,11 @@ async def test_checkpoint_roundtrip_with_blackboard():
     store = CheckpointStore()
     bb = Blackboard()
     bb._goal = "goal-1"
-    from datetime import datetime
+    from datetime import UTC, datetime
     await store.save(Checkpoint(
         flow_id="cp1", flow_state="suspended", node_states={"n": "waiting"},
         variables={"x": [1, 2]}, blackboard_snapshot=bb.to_dict(),
-        current_node="n", pending_events=["ask"], created_at=datetime.now(),
+        current_node="n", pending_events=["ask"], created_at=datetime.now(UTC),
         metadata={"_wait_config_n": {"on_event": "m"}, "other": 1},
         workflow_id="wf", definition={"id": "wf"},
     ))
@@ -224,7 +222,7 @@ async def test_scheduler_no_overlap_and_failure_recorded():
 
 def test_schedule_validator():
     from cortexflow.dsl.schema import WorkflowDefinition
-    from cortexflow.dsl.validator import Validator, ValidationError
+    from cortexflow.dsl.validator import ValidationError, Validator
     base = {"id": "s", "name": "S", "entry": "a",
             "nodes": {"a": {"type": "state", "on_success": "__end__"}}}
     Validator().validate(WorkflowDefinition(**{**base, "schedule": {

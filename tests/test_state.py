@@ -2,7 +2,7 @@
 
 import pytest
 
-from cortexflow.state.blackboard import Blackboard, Delegation, Observation
+from cortexflow.state.blackboard import Blackboard
 from cortexflow.state.checkpoint import Checkpoint, CheckpointStore
 from cortexflow.state.variables import VariableScope
 
@@ -67,9 +67,9 @@ async def test_checkpoint_store():
         pending_events=["event1"],
         created_at=None,
     )
-    from datetime import datetime
+    from datetime import UTC, datetime
 
-    checkpoint.created_at = datetime.now()
+    checkpoint.created_at = datetime.now(UTC)
     await store.save(checkpoint)
     loaded = await store.load("test_flow")
     assert loaded is not None
