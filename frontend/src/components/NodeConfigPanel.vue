@@ -93,6 +93,20 @@ const FIELDS = {
     { key: 'retrieval_source', label: '来源', type: 'text' },
     { key: 'retrieval_top_k', label: 'Top K', type: 'number' },
   ],
+  knowledge: [
+    {
+      key: 'knowledge_action',
+      label: '操作',
+      type: 'select',
+      options: ['ingest_text', 'ingest_file', 'ingest_directory', 'list', 'delete', 'clear'],
+    },
+    { key: 'knowledge_source', label: '文本或路径', type: 'textarea' },
+    { key: 'knowledge_namespace', label: '命名空间', type: 'text' },
+    { key: 'knowledge_chunk_size', label: '分块大小', type: 'number' },
+    { key: 'knowledge_overlap', label: '分块重叠', type: 'number' },
+    { key: 'knowledge_metadata', label: '元数据', type: 'kv' },
+    { key: 'knowledge_entry_id', label: '删除的条目 ID', type: 'text' },
+  ],
   memory: [
     { key: 'memory_action', label: '动作', type: 'select', options: ['store', 'query'] },
     { key: 'memory_content', label: '内容', type: 'textarea' },
@@ -167,11 +181,19 @@ const debugOutput = computed(() => {
   if (result.status === 'suspended') {
     return `等待事件: ${result.waiting?.event_type || '未知'}（节点 ${result.waiting?.node_id || '-'}）`
   }
-  const value = result.result !== undefined && result.result !== null
-    ? result.result
-    : result.variables
+  let value = result.result
+  if (value === undefined || value === null) {
+    const lastWithResult = [...(result.steps || [])].reverse().find((step) => step.result !== undefined)
+    value = lastWithResult ? lastWithResult.result : result.variables
+  }
   return typeof value === 'string' ? value : JSON.stringify(value, null, 2)
 })
+
+function stepTitle(step) {
+  if (step.error) return step.error
+  if (step.result === undefined) return ''
+  return typeof step.result === 'string' ? step.result : JSON.stringify(step.result, null, 2)
+}
 
 function defaultsJson() {
   const out = {}
@@ -600,7 +622,7 @@ async function runDebug(toEnd = false) {
         </div>
 
         <div v-if="debugResult?.steps?.length" class="ncp-steps">
-          <div v-for="(step, i) in debugResult.steps" :key="i" class="ncp-step">
+          <div v-for="(step, i) in debugResult.steps" :key="i" class="ncp-step" :title="stepTitle(step)">
             <span class="ncp-step-dot" :class="step.status"></span>
             <span class="ncp-step-name">{{ step.node_id }}</span>
             <span class="ncp-step-type">{{ step.type }}</span>

@@ -553,6 +553,8 @@ def _summarize_debug_events(events: list[Event]) -> tuple[list[dict[str, Any]], 
             step["status"] = "completed" if event.type == EventType.NODE_COMPLETED else "failed"
             if event.type == EventType.NODE_COMPLETED:
                 step["duration_ms"] = round(float(payload.get("duration") or 0) * 1000, 1)
+                if "result" in payload:
+                    step["result"] = payload["result"]
             else:
                 step["error"] = payload.get("error")
         elif event.type == EventType.MESSAGE:
@@ -598,6 +600,7 @@ async def debug_run(request: DebugRunRequest):
     engine.apply_tier_cache(run_ir)
     context = engine.build_context(run_ir, request.variables or {}, workflow.model_dump())
     context.event_bus = bus
+    context.metadata["_debug"] = True
 
     started = time.monotonic()
     status = "completed"

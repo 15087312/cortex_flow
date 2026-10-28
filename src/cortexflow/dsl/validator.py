@@ -195,6 +195,33 @@ class Validator:
                         f"(or allow_all: true)"
                     )
 
+            if node.type == NodeType.KNOWLEDGE:
+                action = node.knowledge_action
+                if action not in {
+                    "ingest_text",
+                    "ingest_file",
+                    "ingest_directory",
+                    "list",
+                    "delete",
+                    "clear",
+                }:
+                    raise ValidationError(
+                        f"Knowledge node '{node_id}' has unknown knowledge_action '{action}'"
+                    )
+                if action.startswith("ingest") and not node.knowledge_source:
+                    raise ValidationError(
+                        f"Knowledge node '{node_id}' {action} needs 'knowledge_source'"
+                    )
+                if action == "delete" and not node.knowledge_entry_id:
+                    raise ValidationError(
+                        f"Knowledge node '{node_id}' delete needs 'knowledge_entry_id'"
+                    )
+                if node.knowledge_overlap >= node.knowledge_chunk_size:
+                    raise ValidationError(
+                        f"Knowledge node '{node_id}' knowledge_overlap must be "
+                        f"smaller than knowledge_chunk_size"
+                    )
+
             if node.type == NodeType.TEXT and not node.text_action:
                 raise ValidationError(f"Text node '{node_id}' missing 'text_action'")
 

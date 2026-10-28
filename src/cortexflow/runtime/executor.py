@@ -238,11 +238,15 @@ class Executor:
                         node_id=node_ir.id,
                         output_summary={"result": snapshot_value(result)},
                     )
-                await self._publish(EventType.NODE_COMPLETED, {
+                completed_payload: dict[str, Any] = {
                     "flow_id": context.flow_id,
                     "node_id": node_ir.id,
                     "duration": duration,
-                })
+                }
+                if context.metadata.get("_debug"):
+                    # Editor dry-runs want per-node IO; live runs keep events lean.
+                    completed_payload["result"] = snapshot_value(result)
+                await self._publish(EventType.NODE_COMPLETED, completed_payload)
                 return result
 
             except WaitEvent as w:

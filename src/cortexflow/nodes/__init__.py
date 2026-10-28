@@ -13,6 +13,7 @@ from cortexflow.nodes.database import DatabaseNode
 from cortexflow.nodes.end import EndNode
 from cortexflow.nodes.http_request import HttpRequestNode
 from cortexflow.nodes.intent import IntentNode
+from cortexflow.nodes.knowledge import KnowledgeNode
 from cortexflow.nodes.loop import LoopNode
 from cortexflow.nodes.map import MapNode
 from cortexflow.nodes.memory import MemoryNode
@@ -44,6 +45,7 @@ __all__ = [
     "EndNode",
     "HttpRequestNode",
     "IntentNode",
+    "KnowledgeNode",
     "LoopNode",
     "MapNode",
     "MemoryNode",

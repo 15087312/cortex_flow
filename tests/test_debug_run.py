@@ -61,6 +61,39 @@ async def test_run_from_node_to_end(app):
 
 
 @pytest.mark.asyncio
+async def test_run_includes_per_node_results(app):
+    resp = await _post(app, {"definition": _chat_flow(), "variables": {"n": 3}})
+    steps = resp.json()["steps"]
+    assert steps[0]["result"] == 6
+    assert steps[1]["result"] == "total is 6"
+
+
+@pytest.mark.asyncio
+async def test_live_runs_do_not_carry_node_results():
+    from cortexflow.engine import Engine
+
+    engine = Engine()
+    payloads = []
+
+    async def collect(event):
+        if event.type == "node.completed":
+            payloads.append(event.payload)
+
+    await engine.event_bus.subscribe("*", collect)
+    flow = engine.load_from_string("""
+id: live
+name: live
+entry: m
+nodes:
+  m:
+    type: message
+    message: hi
+""")
+    await engine.run(flow)
+    assert payloads and all("result" not in payload for payload in payloads)
+
+
+@pytest.mark.asyncio
 async def test_run_from_middle_node_skips_earlier_nodes(app):
     resp = await _post(app, {
         "definition": _chat_flow(),

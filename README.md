@@ -22,11 +22,11 @@
 | 流程控制 | `branch` / `loop` / `parallel` / `map` / `subflow` | 条件分支、循环、并发、集合映射、子流程 |
 | 流程控制 | `wait` / `ask` / `end` / `break` / `continue` / `aggregate` | 事件挂起、人工追问、结束、循环控制、分支收敛 |
 | 数据 | `state` / `transform` / `text` / `code` / `database` | 变量读写、结构映射、字符串处理、Python 片段、SQLite 增删改查 |
-| 集成 | `http_request` / `retrieval` / `memory` / `perception` | HTTP 调用、知识库检索、长期记忆、感知输入 |
+| 集成 | `http_request` / `retrieval` / `knowledge` / `memory` / `perception` | HTTP 调用、知识库检索/写入、长期记忆、感知输入 |
 | 对话 | `message` | 向对话界面实时推送消息（`flow.message` 事件） |
 | 路由 | `intent` | 关键词意图分流 |
 
-新增的 Coze 风格节点示例见 [examples/data_processing_flow.yaml](./examples/data_processing_flow.yaml)。
+新增的 Coze 风格节点示例见 [examples/data_processing_flow.yaml](./examples/data_processing_flow.yaml)；知识库写入 + 检索见 [examples/knowledge_base_flow.yaml](./examples/knowledge_base_flow.yaml)。
 
 > `code` 节点只暴露白名单内置函数（无 `open`/`eval`/`import`），但它运行在宿主解释器里，属于防误用而非安全沙箱，请只运行可信工作流。
 

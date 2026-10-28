@@ -1,0 +1,55 @@
+id: knowledge_base
+name: 知识库写入与检索
+version: 1.0.0
+description: 演示 knowledge 节点切分入库，再由 retrieval 节点检索并用 message 节点回复
+config:
+  default_tier: default
+  role: assistant
+variables:
+  question:
+    type: string
+    default: refund policy
+    description: 检索问题
+entry: ingest
+nodes:
+  ingest:
+    type: knowledge
+    knowledge_action: ingest_text
+    knowledge_source: |
+      Refund policy: refunds are processed within 3 business days.
+      Shipping: orders ship within 24 hours on business days.
+      Support: contact support@example.com for help.
+    knowledge_namespace: demo_kb
+    knowledge_chunk_size: 200
+    knowledge_overlap: 20
+    output: ingest_result
+    on_success: search
+
+  search:
+    type: retrieval
+    retrieval_query: ${question}
+    retrieval_collection: demo_kb
+    retrieval_top_k: 3
+    output: hits
+    on_success: merge
+
+  merge:
+    type: text
+    text_action: join
+    input: ${hits.documents}
+    text_args:
+      separator: "\n---\n"
+    output: context_text
+    on_success: reply
+
+  reply:
+    type: message
+    role: assistant
+    message: "根据知识库找到 ${hits.count} 条资料：\n${context_text}"
+    output: reply_text
+    on_success: done
+
+  done:
+    type: end
+    end_mode: variable
+    return_value: ${reply_text}

@@ -25,6 +25,7 @@ class NodeType(str, Enum):
     TRANSFORM = "transform"
     MEMORY = "memory"
     RETRIEVAL = "retrieval"
+    KNOWLEDGE = "knowledge"
     AGENT = "agent"
     COLLABORATE = "collaborate"
     SKILL = "skill"
@@ -278,6 +279,15 @@ class NodeDefinition(BaseModel):
     retrieval_source: str | None = Field(default=None)
     retrieval_top_k: int | None = Field(default=None, ge=1)
     retrieval_collection: str | None = Field(default=None)
+
+    # Knowledge node fields (ingest documents into the retrieval namespace)
+    knowledge_action: str = Field(default="ingest_text")
+    knowledge_source: str | None = Field(default=None)
+    knowledge_namespace: str | None = Field(default=None)
+    knowledge_chunk_size: int = Field(default=500, ge=1)
+    knowledge_overlap: int = Field(default=50, ge=0)
+    knowledge_metadata: dict[str, Any] = Field(default_factory=dict)
+    knowledge_entry_id: str | None = Field(default=None)
 
     # Agent node fields
     agent_id: str | None = Field(default=None)
