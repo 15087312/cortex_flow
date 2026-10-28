@@ -196,6 +196,28 @@ class Engine:
         """
         return self._build_context(ir, variables, definition)
 
+    def debug_executor(self, event_bus: Any = None) -> Executor:
+        """Executor clone for editor dry-runs.
+
+        It shares no bus with the live engine (so debug runs stay silent), skips
+        tracing/metrics and never persists checkpoints, but keeps registered
+        subflows so `subflow` nodes still resolve.
+        """
+        clone = Executor(
+            event_bus=event_bus,
+            tracer=None,
+            metrics=None,
+            checkpoint_store=self.checkpoint_store,
+            persist_checkpoints=False,
+        )
+        for sub_id, sub_wf in self._subflow_registry.items():
+            clone.register_subflow(sub_id, self.compile(sub_wf))
+        return clone
+
+    def apply_tier_cache(self, ir: Any) -> None:
+        """Expose compiled tiers to the shared model adapter."""
+        self._model_adapter.set_tier_cache(ir.tiers)
+
     def _build_context(self, ir: Any, variables: dict[str, Any] | None,
                          definition: dict[str, Any] | None = None) -> ExecutionContext:
         from cortexflow.state.blackboard import Blackboard

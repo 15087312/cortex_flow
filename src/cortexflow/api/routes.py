@@ -512,6 +512,124 @@ async def debug_node(request: NodeDebugRequest):
     }
 
 
+class DebugRunRequest(BaseModel):
+    """Run a workflow from a chosen node to completion, silently."""
+
+    definition: dict[str, Any]
+    node_id: str | None = None
+    variables: dict[str, Any] | None = None
+    timeout: float = 60.0
+
+
+def _summarize_debug_events(events: list[Event]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Turn a debug run's event stream into steps + chat messages.
+
+    Node ids can repeat (loops), so completed/failed events are matched
+    against the most recent still-running step for that id.
+    """
+    from cortexflow.events.types import EventType
+
+    steps: list[dict[str, Any]] = []
+    active: dict[str, list[dict[str, Any]]] = {}
+    messages: list[dict[str, Any]] = []
+
+    for event in events:
+        payload = event.payload
+        node_id = payload.get("node_id") or ""
+        if event.type == EventType.NODE_STARTED:
+            step = {
+                "node_id": node_id,
+                "type": payload.get("node_type"),
+                "status": "running",
+                "duration_ms": None,
+            }
+            steps.append(step)
+            active.setdefault(node_id, []).append(step)
+        elif event.type in (EventType.NODE_COMPLETED, EventType.NODE_FAILED):
+            stack = active.get(node_id) or []
+            if not stack:
+                continue
+            step = stack.pop()
+            step["status"] = "completed" if event.type == EventType.NODE_COMPLETED else "failed"
+            if event.type == EventType.NODE_COMPLETED:
+                step["duration_ms"] = round(float(payload.get("duration") or 0) * 1000, 1)
+            else:
+                step["error"] = payload.get("error")
+        elif event.type == EventType.MESSAGE:
+            messages.append({
+                "role": payload.get("role"),
+                "content": payload.get("content"),
+                "node_id": node_id,
+            })
+
+    return steps, messages
+
+
+@router.post("/debug/run")
+async def debug_run(request: DebugRunRequest):
+    """Run from a node to the end without touching the live engine.
+
+    The run gets its own event bus, so messages and node events are captured
+    and returned instead of being broadcast to the UI or chat.
+    """
+    from dataclasses import replace
+
+    from cortexflow.dsl.schema import WorkflowDefinition
+    from cortexflow.events.bus import EventBus
+    from cortexflow.runtime.events import WaitEvent
+
+    engine = _get_engine()
+    try:
+        workflow = WorkflowDefinition(**request.definition)
+        ir = engine.compile(workflow)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"工作流定义无效: {exc}")
+
+    start_id = request.node_id or ir.entry
+    if start_id not in ir.nodes:
+        raise HTTPException(status_code=404, detail=f"节点不存在: {start_id}")
+
+    run_ir = replace(ir, entry=start_id)
+    bus = EventBus()
+    collected: list[Event] = []
+    await bus.subscribe("*", collected.append)
+
+    executor = engine.debug_executor(bus)
+    engine.apply_tier_cache(run_ir)
+    context = engine.build_context(run_ir, request.variables or {}, workflow.model_dump())
+    context.event_bus = bus
+
+    started = time.monotonic()
+    status = "completed"
+    error: str | None = None
+    waiting: dict[str, Any] | None = None
+    result: Any = None
+    try:
+        result = await asyncio.wait_for(executor.execute(run_ir, context), timeout=request.timeout)
+    except WaitEvent as exc:
+        status = "suspended"
+        waiting = {"event_type": exc.event_type, "filter": exc.filter, "node_id": context.current_node}
+    except TimeoutError:
+        status = "failed"
+        error = f"运行超时（{request.timeout}s）"
+    except Exception as exc:  # noqa: BLE001
+        status = "failed"
+        error = str(exc)
+
+    steps, messages = _summarize_debug_events(collected)
+    return {
+        "status": status,
+        "start_node": start_id,
+        "result": result,
+        "error": error,
+        "waiting": waiting,
+        "duration_ms": round((time.monotonic() - started) * 1000, 1),
+        "steps": steps,
+        "messages": messages,
+        "variables": context.variables,
+    }
+
+
 @router.websocket("/events")
 async def event_stream(websocket: WebSocket):
     """WebSocket endpoint for real-time event streaming."""

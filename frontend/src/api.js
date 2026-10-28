@@ -152,3 +152,11 @@ export const deleteMarketplace = (id) => request('DELETE', `/marketplace/${id}`)
 // Node dry-run (editor debugger)
 export const debugNode = (definition, nodeId, variables) =>
   request('POST', '/debug/node', { definition, node_id: nodeId, variables: variables || {} })
+
+export const debugRun = (definition, nodeId, variables, timeout) =>
+  request('POST', '/debug/run', {
+    definition,
+    node_id: nodeId,
+    variables: variables || {},
+    timeout: timeout || 60,
+  })

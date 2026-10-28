@@ -30,12 +30,15 @@ class Executor:
         tracer: Any = None,
         metrics: Any = None,
         checkpoint_store: CheckpointStore | None = None,
+        persist_checkpoints: bool = True,
     ):
         self.dispatcher = NodeDispatcher()
         self.event_bus = event_bus
         self.tracer = tracer
         self.metrics = metrics
         self.checkpoint_store = checkpoint_store or CheckpointStore()
+        # Editor dry-runs flip this off so they never leave resumable state.
+        self.persist_checkpoints = persist_checkpoints
         self._subflow_registry: dict[str, FlowIR] = {}
 
     def register_subflow(self, flow_id: str, flow_ir: FlowIR) -> None:
@@ -376,6 +379,8 @@ class Executor:
     # ── Internal: suspend / checkpoint ────────────────────────────
 
     async def _save_checkpoint(self, context: ExecutionContext, wait_event: WaitEvent) -> None:
+        if not self.persist_checkpoints:
+            return
         checkpoint = Checkpoint(
             flow_id=context.flow_id,
             workflow_id=context.flow_id.split("/")[0],

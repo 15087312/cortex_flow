@@ -32,17 +32,25 @@
 
 ## 调试与试运行
 
-- 图形模式下选中节点，右侧配置面板底部有「试运行」：填写变量 JSON 后只执行当前节点，结果与耗时直接显示在面板里。
-- 试运行不会触发事件、不会跳转后续节点，因此不会往对话页推送消息。
+- 图形模式下选中节点，右侧配置面板底部有「试运行」：
+  - **运行此节点**：只执行当前节点，快速验证单个节点的输入输出。
+  - **运行到结束**：从当前节点开始跑到流程结束，返回执行链路（每步状态/耗时）、对话消息和最终变量。
+- 两种试运行都使用独立事件总线：不会触发全局订阅、不会往对话页推消息、不写 checkpoint，调试不会污染线上状态。
 - 也可以直接调用 API：
 
 ```bash
+# 只跑一个节点
 curl -X POST http://127.0.0.1:9000/api/debug/node \
   -H 'Content-Type: application/json' \
   -d '{"definition": {...}, "node_id": "calc", "variables": {"numbers": [1,2,3]}}'
+
+# 从节点跑到结束
+curl -X POST http://127.0.0.1:9000/api/debug/run \
+  -H 'Content-Type: application/json' \
+  -d '{"definition": {...}, "node_id": "calc", "variables": {"numbers": [1,2,3]}, "timeout": 60}'
 ```
 
-返回 `status`（`completed` / `failed`）、`result`、`duration_ms` 与执行后的变量快照。
+`/api/debug/node` 返回 `status` / `result` / `duration_ms`；`/api/debug/run` 额外返回 `steps`、`messages`、`waiting`（遇到 `wait`/`ask` 节点时）与最终 `variables`。
 
 ## 环境要求
 

@@ -155,12 +155,22 @@ const icon = computed(() => getNodeIcon(type.value))
 const config = computed(() => props.node?.config || {})
 const fields = computed(() => FIELDS[type.value] || [])
 
+const debugStatusLabel = computed(() => {
+  const status = debugResult.value?.status
+  return { completed: '完成', failed: '失败', suspended: '暂停' }[status] || status || ''
+})
+
 const debugOutput = computed(() => {
-  if (!debugResult.value) return ''
-  if (debugResult.value.status === 'failed') return debugResult.value.error || '失败'
-  return typeof debugResult.value.result === 'string'
-    ? debugResult.value.result
-    : JSON.stringify(debugResult.value.result, null, 2)
+  const result = debugResult.value
+  if (!result) return ''
+  if (result.status === 'failed') return result.error || '失败'
+  if (result.status === 'suspended') {
+    return `等待事件: ${result.waiting?.event_type || '未知'}（节点 ${result.waiting?.node_id || '-'}）`
+  }
+  const value = result.result !== undefined && result.result !== null
+    ? result.result
+    : result.variables
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2)
 })
 
 function defaultsJson() {
@@ -322,7 +332,7 @@ function toggleDebug() {
   }
 }
 
-async function runDebug() {
+async function runDebug(toEnd = false) {
   if (!props.definition) {
     debugError.value = 'YAML 解析失败，无法试运行'
     return
@@ -338,7 +348,9 @@ async function runDebug() {
   debugError.value = ''
   debugResult.value = null
   try {
-    debugResult.value = await api.debugNode(props.definition, props.node.id, variables)
+    debugResult.value = toEnd
+      ? await api.debugRun(props.definition, props.node.id, variables)
+      : await api.debugNode(props.definition, props.node.id, variables)
   } catch (e) {
     debugError.value = e.message
   } finally {
@@ -574,15 +586,34 @@ async function runDebug() {
 
       <div v-if="debugOpen" class="ncp-debug">
         <span class="ncp-hint">输入变量（JSON）</span>
-        <textarea v-model="debugVars" class="input ncp-code" rows="3" spellcheck="false"></textarea>
-        <div style="display: flex; align-items: center; gap: var(--space-sm)">
-          <button class="btn btn-sm btn-primary" :disabled="debugging" @click="runDebug">
+        <textarea v-model="debugVars" class="input ncp-code" rows="2" spellcheck="false"></textarea>
+        <div style="display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap">
+          <button class="btn btn-sm btn-primary" :disabled="debugging" @click="runDebug(false)">
             {{ debugging ? '运行中…' : '运行此节点' }}
           </button>
+          <button class="btn btn-sm" :disabled="debugging" @click="runDebug(true)">
+            运行到结束
+          </button>
           <span v-if="debugResult" class="ncp-hint">
-            {{ debugResult.status }} · {{ debugResult.duration_ms }}ms
+            {{ debugStatusLabel }} · {{ debugResult.duration_ms }}ms
           </span>
         </div>
+
+        <div v-if="debugResult?.steps?.length" class="ncp-steps">
+          <div v-for="(step, i) in debugResult.steps" :key="i" class="ncp-step">
+            <span class="ncp-step-dot" :class="step.status"></span>
+            <span class="ncp-step-name">{{ step.node_id }}</span>
+            <span class="ncp-step-type">{{ step.type }}</span>
+            <span class="ncp-step-dur">{{ step.duration_ms != null ? `${step.duration_ms}ms` : '' }}</span>
+          </div>
+        </div>
+
+        <div v-if="debugResult?.messages?.length" class="ncp-debug-msgs">
+          <div v-for="(msg, i) in debugResult.messages" :key="i" class="ncp-debug-msg">
+            <strong>{{ msg.role }}</strong> {{ msg.content }}
+          </div>
+        </div>
+
         <pre v-if="debugResult" class="ncp-debug-out">{{ debugOutput }}</pre>
         <div v-if="debugError" class="ncp-error">{{ debugError }}</div>
       </div>
@@ -626,7 +657,19 @@ async function runDebug() {
 .ncp-divider { height: 1px; background: var(--border); margin: var(--space-xs) 0; }
 .ncp-hint { font-size: var(--text-xs); color: var(--text-muted); }
 .ncp-error { font-size: var(--text-xs); color: var(--danger); }
-.ncp-footer { padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-sm); max-height: 45%; overflow-y: auto; }
+.ncp-footer { padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-sm); max-height: 60%; overflow-y: auto; }
 .ncp-debug { display: flex; flex-direction: column; gap: 6px; }
-.ncp-debug-out { margin: 0; padding: var(--space-sm); background: var(--bg-inset); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--text-xs); white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow-y: auto; }
+.ncp-debug-out { margin: 0; padding: var(--space-sm); background: var(--bg-inset); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--text-xs); white-space: pre-wrap; word-break: break-word; max-height: 120px; overflow-y: auto; }
+.ncp-steps { display: flex; flex-direction: column; gap: 2px; padding: var(--space-xs) 0; }
+.ncp-step { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-family: var(--font-mono); }
+.ncp-step-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.ncp-step-dot.completed { background: var(--success); }
+.ncp-step-dot.failed { background: var(--danger); }
+.ncp-step-dot.running { background: var(--accent); }
+.ncp-step-name { color: var(--text-primary); }
+.ncp-step-type { color: var(--text-muted); }
+.ncp-step-dur { margin-left: auto; color: var(--text-muted); }
+.ncp-debug-msgs { display: flex; flex-direction: column; gap: 4px; }
+.ncp-debug-msg { font-size: var(--text-xs); padding: 4px 8px; background: var(--bg-inset); border-radius: var(--radius-sm); }
+.ncp-debug-msg strong { color: var(--accent); font-weight: 600; margin-right: 4px; }
 </style>
