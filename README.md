@@ -30,6 +30,20 @@
 
 > `code` 节点只暴露白名单内置函数（无 `open`/`eval`/`import`），但它运行在宿主解释器里，属于防误用而非安全沙箱，请只运行可信工作流。
 
+## 调试与试运行
+
+- 图形模式下选中节点，右侧配置面板底部有「试运行」：填写变量 JSON 后只执行当前节点，结果与耗时直接显示在面板里。
+- 试运行不会触发事件、不会跳转后续节点，因此不会往对话页推送消息。
+- 也可以直接调用 API：
+
+```bash
+curl -X POST http://127.0.0.1:9000/api/debug/node \
+  -H 'Content-Type: application/json' \
+  -d '{"definition": {...}, "node_id": "calc", "variables": {"numbers": [1,2,3]}}'
+```
+
+返回 `status`（`completed` / `failed`）、`result`、`duration_ms` 与执行后的变量快照。
+
 ## 环境要求
 
 - Python 3.11+

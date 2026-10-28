@@ -183,6 +183,19 @@ class Engine:
         """Get collected metrics."""
         return self.metrics.get_stats()
 
+    def build_context(
+        self,
+        ir: Any,
+        variables: dict[str, Any] | None = None,
+        definition: dict[str, Any] | None = None,
+    ) -> ExecutionContext:
+        """Public wrapper around :meth:`_build_context`.
+
+        Used by the API for single-node dry-runs and by embedders that need
+        to drive nodes themselves.
+        """
+        return self._build_context(ir, variables, definition)
+
     def _build_context(self, ir: Any, variables: dict[str, Any] | None,
                          definition: dict[str, Any] | None = None) -> ExecutionContext:
         from cortexflow.state.blackboard import Blackboard

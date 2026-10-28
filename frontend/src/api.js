@@ -148,3 +148,7 @@ export const getMarketplaceTemplate = (id) => request('GET', `/marketplace/${id}
 export const publishMarketplace = (workflowId, description, tags) =>
   request('POST', '/marketplace', { workflow_id: workflowId, description, tags })
 export const deleteMarketplace = (id) => request('DELETE', `/marketplace/${id}`)
+
+// Node dry-run (editor debugger)
+export const debugNode = (definition, nodeId, variables) =>
+  request('POST', '/debug/node', { definition, node_id: nodeId, variables: variables || {} })

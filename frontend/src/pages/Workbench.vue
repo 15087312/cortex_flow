@@ -64,14 +64,16 @@ const selectedNodeSuccessor = ref('')
 let validateTimer = null
 let syncLock = false
 
-const parsedVariables = computed(() => {
+const parsedDefinition = computed(() => {
   try {
     const parsed = yaml.load(editorContent.value)
-    return parsed?.variables || {}
+    return parsed && typeof parsed === 'object' ? parsed : null
   } catch {
-    return {}
+    return null
   }
 })
+
+const parsedVariables = computed(() => parsedDefinition.value?.variables || {})
 
 function autoLayoutPositions(entries) {
   const nodeWidth = 180, nodeHeight = 80, gapX = 60, gapY = 50
@@ -560,6 +562,8 @@ onMounted(() => {
           :node="selectedNode"
           :node-ids="graphNodes.map(n => n.id)"
           :successor="selectedNodeSuccessor"
+          :definition="parsedDefinition"
+          :variables="parsedVariables"
           @update="updateSelectedNodeConfig"
           @connect="onConfigConnect"
           @close="clearNodeSelection"

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import * as api from '@/api.js'
 import Icon from '@/components/Icon.vue'
 import { getNodeIcon } from '@/components/nodeStyles.js'
 
@@ -7,6 +8,8 @@ const props = defineProps({
   node: { type: Object, required: true },
   nodeIds: { type: Array, default: () => [] },
   successor: { type: String, default: '' },
+  definition: { type: Object, default: null },
+  variables: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update', 'close', 'delete', 'connect'])
@@ -18,28 +21,174 @@ const TEXT_ACTIONS = [
 ]
 const DB_ACTIONS = ['query', 'insert', 'update', 'delete', 'execute']
 
+// Generic form descriptors for node types without a bespoke form.
+const FIELDS = {
+  model: [
+    { key: 'tier', label: 'Tier', type: 'text' },
+    { key: 'identity', label: 'Identity', type: 'text' },
+    { key: 'prompt_strategy', label: '提示词策略', type: 'text' },
+    { key: 'custom_system', label: '系统提示词', type: 'textarea' },
+    { key: 'output_format', label: '输出格式', type: 'select', options: ['text', 'json', 'structured'] },
+    { key: 'input', label: '输入 (JSON)', type: 'json' },
+  ],
+  tool: [
+    { key: 'tool', label: '工具名', type: 'text' },
+    { key: 'args', label: '参数', type: 'kv' },
+    { key: 'require_approval', label: '需要审批', type: 'checkbox' },
+    { key: 'approval_timeout', label: '审批超时 (秒)', type: 'number' },
+  ],
+  branch: [
+    { key: 'mode', label: '模式', type: 'select', options: ['expression', 'model_decision'] },
+    { key: 'prompt', label: '路由提示词', type: 'textarea' },
+    { key: 'conditions', label: '条件 (JSON)', type: 'json' },
+    { key: 'output_mapping', label: '输出映射', type: 'kv' },
+  ],
+  loop: [
+    { key: 'loop_mode', label: '循环模式', type: 'select', options: ['count', 'condition', 'until', 'foreach'] },
+    { key: 'items', label: '集合 (foreach)', type: 'text' },
+    { key: 'count', label: '次数 (count)', type: 'number' },
+    { key: 'condition', label: '条件 (condition)', type: 'text' },
+    { key: 'until', label: '结束条件 (until)', type: 'text' },
+    { key: 'body', label: '循环体节点', type: 'text' },
+    { key: 'item_var', label: '元素变量', type: 'text' },
+    { key: 'index_var', label: '索引变量', type: 'text' },
+    { key: 'max_iterations', label: '最大迭代', type: 'number' },
+    { key: 'break_condition', label: '跳出条件', type: 'text' },
+    { key: 'continue_condition', label: '继续条件', type: 'text' },
+    { key: 'on_complete', label: '完成后跳转', type: 'text' },
+  ],
+  http_request: [
+    { key: 'method', label: '方法', type: 'select', options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
+    { key: 'url', label: 'URL', type: 'text' },
+    { key: 'headers', label: '请求头', type: 'kv' },
+    { key: 'body', label: '请求体 (JSON)', type: 'json' },
+    { key: 'fail_on_error', label: '4xx/5xx 视为失败', type: 'checkbox' },
+  ],
+  state: [{ key: 'actions', label: '动作 (JSON)', type: 'json' }],
+  end: [
+    { key: 'end_mode', label: '模式', type: 'select', options: ['variable', 'text'] },
+    { key: 'return_value', label: '返回值', type: 'text' },
+  ],
+  ask: [
+    { key: 'question', label: '问题', type: 'textarea' },
+    { key: 'on_event', label: '答复后跳转', type: 'text' },
+    { key: 'on_timeout', label: '超时跳转', type: 'text' },
+  ],
+  wait: [
+    { key: 'event', label: '事件名', type: 'text' },
+    { key: 'filter', label: '过滤条件', type: 'kv' },
+    { key: 'on_event', label: '事件到达跳转', type: 'text' },
+    { key: 'on_timeout', label: '超时跳转', type: 'text' },
+  ],
+  transform: [
+    { key: 'input', label: '输入', type: 'text' },
+    { key: 'mapping', label: '映射', type: 'kv' },
+  ],
+  agent: [
+    { key: 'agent', label: 'Agent', type: 'text' },
+    { key: 'message', label: '消息', type: 'textarea' },
+  ],
+  retrieval: [
+    { key: 'retrieval_query', label: '查询', type: 'text' },
+    { key: 'retrieval_source', label: '来源', type: 'text' },
+    { key: 'retrieval_top_k', label: 'Top K', type: 'number' },
+  ],
+  memory: [
+    { key: 'memory_action', label: '动作', type: 'select', options: ['store', 'query'] },
+    { key: 'memory_content', label: '内容', type: 'textarea' },
+    { key: 'memory_namespace', label: '命名空间', type: 'text' },
+    { key: 'memory_top_k', label: 'Top K', type: 'number' },
+  ],
+  intent: [
+    { key: 'input_text', label: '输入文本', type: 'text' },
+    { key: 'intents', label: '意图 (JSON)', type: 'json' },
+    { key: 'otherwise', label: '兜底跳转', type: 'text' },
+  ],
+  parallel: [
+    { key: 'branches', label: '分支 (JSON 数组)', type: 'json' },
+    { key: 'strategy', label: '策略', type: 'select', options: ['all', 'any', 'race'] },
+    { key: 'max_concurrency', label: '最大并发', type: 'number' },
+  ],
+  map: [
+    { key: 'collection', label: '集合', type: 'text' },
+    { key: 'element_var', label: '元素变量', type: 'text' },
+    { key: 'map_body', label: '处理节点', type: 'text' },
+    { key: 'output_collection', label: '输出变量', type: 'text' },
+  ],
+  subflow: [
+    { key: 'flow', label: '子流程 ID', type: 'text' },
+    { key: 'share_blackboard', label: '共享黑板', type: 'checkbox' },
+  ],
+  skill: [
+    { key: 'skill_id', label: '技能 ID', type: 'text' },
+    { key: 'params', label: '参数', type: 'kv' },
+  ],
+  collaborate: [
+    { key: 'pattern', label: '协作模式', type: 'text' },
+    { key: 'agents', label: 'Agents (JSON)', type: 'json' },
+    { key: 'task', label: '任务', type: 'textarea' },
+    { key: 'supervisor', label: 'Supervisor', type: 'text' },
+    { key: 'rounds', label: '轮数', type: 'number' },
+  ],
+  aggregate: [{ key: 'groups', label: '合并组 (JSON)', type: 'json' }],
+  perception: [
+    { key: 'source', label: '来源', type: 'text' },
+    { key: 'config', label: '配置 (JSON)', type: 'json' },
+    { key: 'write_to_blackboard', label: '写入黑板', type: 'checkbox' },
+  ],
+}
+
 const form = ref({})
 const advanced = ref(false)
 const rawJson = ref('')
 const jsonError = ref('')
+const jsonBuffers = ref({})
+
+const debugOpen = ref(false)
+const debugVars = ref('{}')
+const debugResult = ref(null)
+const debugError = ref('')
+const debugging = ref(false)
 
 const type = computed(() => props.node?.type || 'state')
 const icon = computed(() => getNodeIcon(type.value))
 const config = computed(() => props.node?.config || {})
+const fields = computed(() => FIELDS[type.value] || [])
+
+const debugOutput = computed(() => {
+  if (!debugResult.value) return ''
+  if (debugResult.value.status === 'failed') return debugResult.value.error || '失败'
+  return typeof debugResult.value.result === 'string'
+    ? debugResult.value.result
+    : JSON.stringify(debugResult.value.result, null, 2)
+})
+
+function defaultsJson() {
+  const out = {}
+  Object.entries(props.variables || {}).forEach(([key, def]) => {
+    if (def && def.default !== undefined && def.default !== null) out[key] = def.default
+  })
+  return JSON.stringify(out, null, 2)
+}
 
 function load() {
   form.value = JSON.parse(JSON.stringify(config.value || {}))
   advanced.value = false
   rawJson.value = JSON.stringify(form.value, null, 2)
   jsonError.value = ''
+  jsonBuffers.value = {}
+  debugOpen.value = false
+  debugResult.value = null
+  debugError.value = ''
+  debugVars.value = defaultsJson()
 }
 
 watch(() => [props.node?.id, props.node?.type], load, { immediate: true })
 
 function commit() {
   const next = { ...form.value }
-  Object.keys(next).forEach((k) => {
-    if (next[k] === '' || next[k] === undefined) delete next[k]
+  Object.keys(next).forEach((key) => {
+    if (next[key] === '' || next[key] === undefined || next[key] === null) delete next[key]
   })
   emit('update', next)
 }
@@ -50,7 +199,11 @@ function set(key, value) {
 }
 
 function setNumber(key, value) {
-  const num = value === '' ? null : Number(value)
+  if (value === '') {
+    set(key, null)
+    return
+  }
+  const num = Number(value)
   set(key, Number.isFinite(num) ? num : null)
 }
 
@@ -74,6 +227,29 @@ function applyRaw() {
   }
 }
 
+// ── JSON-typed fields ─────────────────────────────────────────
+function jsonText(key) {
+  if (jsonBuffers.value[key] !== undefined) return jsonBuffers.value[key]
+  const value = form.value[key]
+  if (value === undefined || value === null) return ''
+  return JSON.stringify(value, null, 2)
+}
+
+function setJson(key, text) {
+  jsonBuffers.value = { ...jsonBuffers.value, [key]: text }
+  if (!text.trim()) {
+    jsonError.value = ''
+    set(key, null)
+    return
+  }
+  try {
+    set(key, JSON.parse(text))
+    jsonError.value = ''
+  } catch (e) {
+    jsonError.value = `${key}: ${e.message}`
+  }
+}
+
 // ── key/value editors ─────────────────────────────────────────
 function entries(key) {
   const value = form.value[key]
@@ -85,12 +261,12 @@ function updateEntry(key, index, field, value) {
   const list = entries(key)
   const current = list[index]
   if (!current) return
-  const next = field === 'k' ? value : current.k
+  const nextKey = field === 'k' ? value : current.k
   const raw = field === 'v' ? value : current.v
   const obj = {}
   list.forEach((item, i) => {
     if (i === index) {
-      obj[next] = raw
+      obj[nextKey] = raw
     } else if (item.k !== '') {
       obj[item.k] = item.v
     }
@@ -133,6 +309,40 @@ function setDbParams(text) {
     set('db_params', parsed)
   } catch (e) {
     jsonError.value = e.message
+  }
+}
+
+// ── dry-run ───────────────────────────────────────────────────
+function toggleDebug() {
+  debugOpen.value = !debugOpen.value
+  if (debugOpen.value) {
+    debugVars.value = defaultsJson()
+    debugResult.value = null
+    debugError.value = ''
+  }
+}
+
+async function runDebug() {
+  if (!props.definition) {
+    debugError.value = 'YAML 解析失败，无法试运行'
+    return
+  }
+  let variables = {}
+  try {
+    variables = JSON.parse(debugVars.value || '{}')
+  } catch (e) {
+    debugError.value = `变量 JSON 无效: ${e.message}`
+    return
+  }
+  debugging.value = true
+  debugError.value = ''
+  debugResult.value = null
+  try {
+    debugResult.value = await api.debugNode(props.definition, props.node.id, variables)
+  } catch (e) {
+    debugError.value = e.message
+  } finally {
+    debugging.value = false
   }
 }
 </script>
@@ -258,7 +468,7 @@ function setDbParams(text) {
             <input class="input" type="number" min="1" :value="form.limit || ''" @change="setNumber('limit', $event.target.value)" />
           </label>
           <label class="ncp-field ncp-check">
-            <input type="checkbox" :checked="!!form.allow_all" @change="set('allow_all', $event.target.checked || null)" />
+            <input type="checkbox" :checked="!!form.allow_all" @change="set('allow_all', $event.target.checked)" />
             <span>允许全表操作</span>
           </label>
         </div>
@@ -304,6 +514,46 @@ function setDbParams(text) {
         </label>
       </template>
 
+      <!-- generic descriptor-driven forms -->
+      <template v-else-if="fields.length">
+        <div v-for="field in fields" :key="field.key" class="ncp-field">
+          <span>{{ field.label }}</span>
+
+          <input v-if="field.type === 'text'" class="input" :value="form[field.key] || ''"
+            @change="set(field.key, $event.target.value)" />
+
+          <input v-else-if="field.type === 'number'" class="input" type="number"
+            :value="form[field.key] ?? ''" @change="setNumber(field.key, $event.target.value)" />
+
+          <textarea v-else-if="field.type === 'textarea'" class="input ncp-code" rows="3"
+            :value="form[field.key] || ''" @change="set(field.key, $event.target.value)"></textarea>
+
+          <select v-else-if="field.type === 'select'" class="input" :value="form[field.key] || ''"
+            @change="set(field.key, $event.target.value)">
+            <option value="">(默认)</option>
+            <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+          </select>
+
+          <label v-else-if="field.type === 'checkbox'" class="ncp-check">
+            <input type="checkbox" :checked="!!form[field.key]"
+              @change="set(field.key, $event.target.checked)" />
+            <span>启用</span>
+          </label>
+
+          <textarea v-else-if="field.type === 'json'" class="input ncp-code" rows="4" spellcheck="false"
+            :value="jsonText(field.key)" @change="setJson(field.key, $event.target.value)"></textarea>
+
+          <div v-else-if="field.type === 'kv'">
+            <div v-for="(item, i) in entries(field.key)" :key="`${field.key}-${i}`" class="ncp-kv">
+              <input class="input" :value="item.k" placeholder="键" @change="updateEntry(field.key, i, 'k', $event.target.value)" />
+              <input class="input" :value="item.v" placeholder="值" @change="updateEntry(field.key, i, 'v', $event.target.value)" />
+              <button class="btn btn-sm" @click="removeEntry(field.key, i)"><Icon name="x" :size="10" /></button>
+            </div>
+            <button class="btn btn-sm" @click="addEntry(field.key)">+ 添加</button>
+          </div>
+        </div>
+      </template>
+
       <p v-else class="ncp-hint">该节点类型暂无表单，可在下方直接编辑配置 JSON。</p>
 
       <div v-if="jsonError" class="ncp-error">{{ jsonError }}</div>
@@ -317,7 +567,25 @@ function setDbParams(text) {
     </div>
 
     <div class="ncp-footer">
-      <button class="btn btn-sm" style="color: var(--danger)" @click="emit('delete')">删除节点</button>
+      <div style="display: flex; gap: var(--space-sm); width: 100%">
+        <button class="btn btn-sm" @click="toggleDebug">{{ debugOpen ? '收起试运行' : '试运行' }}</button>
+        <button class="btn btn-sm" style="color: var(--danger); margin-left: auto" @click="emit('delete')">删除节点</button>
+      </div>
+
+      <div v-if="debugOpen" class="ncp-debug">
+        <span class="ncp-hint">输入变量（JSON）</span>
+        <textarea v-model="debugVars" class="input ncp-code" rows="3" spellcheck="false"></textarea>
+        <div style="display: flex; align-items: center; gap: var(--space-sm)">
+          <button class="btn btn-sm btn-primary" :disabled="debugging" @click="runDebug">
+            {{ debugging ? '运行中…' : '运行此节点' }}
+          </button>
+          <span v-if="debugResult" class="ncp-hint">
+            {{ debugResult.status }} · {{ debugResult.duration_ms }}ms
+          </span>
+        </div>
+        <pre v-if="debugResult" class="ncp-debug-out">{{ debugOutput }}</pre>
+        <div v-if="debugError" class="ncp-error">{{ debugError }}</div>
+      </div>
     </div>
   </div>
 </template>
@@ -358,5 +626,7 @@ function setDbParams(text) {
 .ncp-divider { height: 1px; background: var(--border); margin: var(--space-xs) 0; }
 .ncp-hint { font-size: var(--text-xs); color: var(--text-muted); }
 .ncp-error { font-size: var(--text-xs); color: var(--danger); }
-.ncp-footer { padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--border); display: flex; }
+.ncp-footer { padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-sm); max-height: 45%; overflow-y: auto; }
+.ncp-debug { display: flex; flex-direction: column; gap: 6px; }
+.ncp-debug-out { margin: 0; padding: var(--space-sm); background: var(--bg-inset); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--text-xs); white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow-y: auto; }
 </style>

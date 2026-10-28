@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -445,6 +446,70 @@ async def list_schedules():
     if _scheduler is None:
         return {"schedules": [], "running": False}
     return {"schedules": _scheduler.status(), "running": True}
+
+
+class NodeDebugRequest(BaseModel):
+    """Dry-run a single node against the definition currently in the editor."""
+
+    definition: dict[str, Any]
+    node_id: str
+    variables: dict[str, Any] | None = None
+
+
+@router.post("/debug/node")
+async def debug_node(request: NodeDebugRequest):
+    """Execute one node in isolation and return its result.
+
+    Dry-runs never emit events and never route to other nodes, so they are
+    safe to trigger from the editor while designing a workflow.
+    """
+    from cortexflow.dsl.schema import WorkflowDefinition
+
+    engine = _get_engine()
+    try:
+        workflow = WorkflowDefinition(**request.definition)
+        ir = engine.compile(workflow)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"工作流定义无效: {exc}")
+
+    node_ir = ir.nodes.get(request.node_id)
+    if node_ir is None:
+        raise HTTPException(status_code=404, detail=f"节点不存在: {request.node_id}")
+
+    context = engine.build_context(ir, request.variables or {}, workflow.model_dump())
+    context.executor = engine.executor
+    context.current_node = request.node_id
+    # Keep the editor dry-run silent: no chat messages, no live UI updates.
+    context.event_bus = None
+
+    timeout = node_ir.config.get("timeout") or 30
+    started = time.monotonic()
+    try:
+        result = await asyncio.wait_for(
+            engine.executor.dispatcher.dispatch(node_ir, context), timeout=timeout
+        )
+    except TimeoutError:
+        return {
+            "status": "failed",
+            "error": f"节点执行超时（{timeout}s）",
+            "duration_ms": round((time.monotonic() - started) * 1000, 1),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "failed",
+            "error": str(exc),
+            "duration_ms": round((time.monotonic() - started) * 1000, 1),
+        }
+
+    return {
+        "status": "completed",
+        "node_id": request.node_id,
+        "node_type": node_ir.type,
+        "result": result,
+        "output": node_ir.config.get("output"),
+        "duration_ms": round((time.monotonic() - started) * 1000, 1),
+        "variables": context.variables,
+    }
 
 
 @router.websocket("/events")
