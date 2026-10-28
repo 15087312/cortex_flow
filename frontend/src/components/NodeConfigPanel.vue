@@ -649,7 +649,7 @@ async function runDebug(toEnd = false) {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 340px;
+  width: min(340px, 100%);
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);

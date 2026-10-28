@@ -513,15 +513,15 @@ onMounted(() => {
     </div>
 
     <!-- Main content -->
-    <div class="flex-1 flex flex-col" style="min-width: 0">
+    <div class="flex-1 flex flex-col workbench-main" style="min-width: 0">
       <!-- Toolbar -->
-      <div style="padding: var(--space-sm) var(--space-lg); border-bottom: 1px solid var(--border); background: var(--bg-secondary); display: flex; align-items: center; justify-content: space-between">
-        <div style="display: flex; align-items: center; gap: var(--space-md)">
-          <input v-model="workflowName" placeholder="工作流名称" class="input" style="width: 180px" />
-          <span v-if="saveStatus" style="font-size: var(--text-xs)" :class="saveStatusClass">{{ saveStatus }}</span>
+      <div class="wb-toolbar">
+        <div class="wb-toolbar-left">
+          <input v-model="workflowName" placeholder="工作流名称" class="input wb-name" />
+          <span v-if="saveStatus" style="font-size: var(--text-xs); white-space: nowrap" :class="saveStatusClass">{{ saveStatus }}</span>
         </div>
-        <div style="display: flex; align-items: center; gap: var(--space-md)">
-          <div style="display: flex; background: var(--bg-inset); border-radius: var(--radius); padding: 2px; border: 1px solid var(--border)">
+        <div class="wb-view">
+          <div class="wb-mode" style="display: flex; background: var(--bg-inset); border-radius: var(--radius); padding: 2px; border: 1px solid var(--border)">
             <button @click="switchMode('graph')"
               style="padding: 4px 12px; border-radius: var(--radius-sm); font-size: var(--text-sm); border: none; cursor: pointer; transition: all 0.15s"
               :style="editMode === 'graph' ? { background: 'var(--accent)', color: 'var(--text-inverse)' } : { background: 'none', color: 'var(--text-muted)' }">
@@ -533,16 +533,16 @@ onMounted(() => {
               YAML
             </button>
           </div>
-          <FlowToolbar v-if="editMode === 'graph'" :zoom="flowEditorRef?.zoom || 1"
+          <FlowToolbar v-if="editMode === 'graph'" class="wb-zoom" :zoom="flowEditorRef?.zoom || 1"
             @fit="fitGraph" @reset="resetGraphView" @auto-layout="autoLayout"
             @zoom-in="graphZoomIn" @zoom-out="graphZoomOut" />
-          <div style="display: flex; gap: var(--space-sm)">
-            <button class="btn" @click="validateYaml">校验</button>
-            <button class="btn" @click="showVersions = true" :disabled="!selectedId" title="查看版本历史与回滚">历史</button>
-            <button class="btn" @click="publishCurrent" :disabled="!selectedId" title="发布到市场">发布</button>
-            <button class="btn btn-primary" @click="saveWorkflow">保存</button>
-            <button class="btn" style="background: var(--success); border-color: var(--success); color: var(--text-inverse)" @click="runWorkflow">运行</button>
-          </div>
+        </div>
+        <div class="wb-actions">
+          <button class="btn" @click="validateYaml">校验</button>
+          <button class="btn" @click="showVersions = true" :disabled="!selectedId" title="查看版本历史与回滚">历史</button>
+          <button class="btn" @click="publishCurrent" :disabled="!selectedId" title="发布到市场">发布</button>
+          <button class="btn btn-primary" @click="saveWorkflow">保存</button>
+          <button class="btn" style="background: var(--success); border-color: var(--success); color: var(--text-inverse)" @click="runWorkflow">运行</button>
         </div>
       </div>
 
@@ -588,3 +588,51 @@ onMounted(() => {
       @rolled-back="onRolledBack" />
   </div>
 </template>
+
+<style scoped>
+.wb-toolbar {
+  padding: var(--space-sm) var(--space-lg);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.wb-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.wb-name {
+  width: clamp(120px, 16vw, 200px);
+  min-width: 0;
+}
+
+.wb-view {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.wb-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Narrow windows: drop the zoom cluster so the toolbar stays on two rows. */
+@media (max-width: 1400px) {
+  .wb-zoom { display: none; }
+}
+</style>
